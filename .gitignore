@@ -1,0 +1,15 @@
+# ROS build artifacts
+build/
+devel/
+install/
+.catkin_workspace
+.catkin_tools/
+
+# Python artifacts
+__pycache__/
+*.pyc
+
+# OS generated files
+.DS_Store
+.vscode/
+.idea/
