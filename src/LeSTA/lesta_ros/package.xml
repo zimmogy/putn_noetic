@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>lesta</name>
+  <version>0.0.0</version>
+  <description>this file is revised from the original github repo of LeSTA</description>
+  <maintainer email="whr511723@gmail.com">Wang Haoran</maintainer>
+  <license>.</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>roscpp</depend>
+  <depend>tf2_ros</depend>
+  <depend>pcl_conversions</depend>
+  <depend>height_mapping_core</depend>
+  <depend>grid_map_ros</depend>
+  <depend>message_generation</depend>
+  <depend>message_runtime</depend>
+  <depend>cv_bridge</depend>
+  <depend>sensor_msgs</depend>
+  <depend>message_filters</depend>
+  
+  <export>
+  </export>
+</package>

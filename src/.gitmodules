@@ -1,0 +1,4 @@
+[submodule "LeSTA"]
+	path = LeSTA
+	url = https://github.com/zimmogy/LeSTA
+	branch = develop

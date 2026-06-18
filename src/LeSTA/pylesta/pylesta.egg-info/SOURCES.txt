@@ -1,0 +1,7 @@
+README.md
+setup.py
+lesta/__init__.py
+pylesta.egg-info/PKG-INFO
+pylesta.egg-info/SOURCES.txt
+pylesta.egg-info/dependency_links.txt
+pylesta.egg-info/top_level.txt

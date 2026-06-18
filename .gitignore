@@ -4,3 +4,8 @@
 # Keep the source workspace and this ignore file versioned.
 !/src/
 !/.gitignore
+
+# Large LeSTA data/model artifacts.
+/src/LeSTA/weight/
+/src/LeSTA/lesta_ros/weights/
+/src/LeSTA/*.pcd
