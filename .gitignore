@@ -1,15 +1,6 @@
-# ROS build artifacts
-build/
-devel/
-install/
-.catkin_workspace
-.catkin_tools/
+# Ignore everything in the workspace root by default.
+/*
 
-# Python artifacts
-__pycache__/
-*.pyc
-
-# OS generated files
-.DS_Store
-.vscode/
-.idea/
+# Keep the source workspace and this ignore file versioned.
+!/src/
+!/.gitignore
