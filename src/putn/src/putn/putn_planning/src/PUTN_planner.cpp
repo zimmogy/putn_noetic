@@ -738,13 +738,14 @@ void PFRRTStar::pubFusedTraversabilityCloud(Publisher* fused_traversability_clou
     msg.is_dense=false;
 
     sensor_msgs::PointCloud2Modifier modifier(msg);
-    modifier.setPointCloud2Fields(8,
+    modifier.setPointCloud2Fields(9,
                                   "x",1,sensor_msgs::PointField::FLOAT32,
                                   "y",1,sensor_msgs::PointField::FLOAT32,
                                   "z",1,sensor_msgs::PointField::FLOAT32,
                                   "fused_risk",1,sensor_msgs::PointField::FLOAT32,
                                   "putn_risk",1,sensor_msgs::PointField::FLOAT32,
                                   "lesta_probability",1,sensor_msgs::PointField::FLOAT32,
+                                  "lesta_risk",1,sensor_msgs::PointField::FLOAT32,
                                   "lesta_observed",1,sensor_msgs::PointField::FLOAT32,
                                   "lesta_traversable",1,sensor_msgs::PointField::FLOAT32);
     modifier.resize(valid_node_num);
@@ -755,6 +756,7 @@ void PFRRTStar::pubFusedTraversabilityCloud(Publisher* fused_traversability_clou
     sensor_msgs::PointCloud2Iterator<float> iter_fused_risk(msg,"fused_risk");
     sensor_msgs::PointCloud2Iterator<float> iter_putn_risk(msg,"putn_risk");
     sensor_msgs::PointCloud2Iterator<float> iter_lesta_probability(msg,"lesta_probability");
+    sensor_msgs::PointCloud2Iterator<float> iter_lesta_risk(msg,"lesta_risk");
     sensor_msgs::PointCloud2Iterator<float> iter_lesta_observed(msg,"lesta_observed");
     sensor_msgs::PointCloud2Iterator<float> iter_lesta_traversable(msg,"lesta_traversable");
 
@@ -768,6 +770,7 @@ void PFRRTStar::pubFusedTraversabilityCloud(Publisher* fused_traversability_clou
         *iter_fused_risk=node->plane_->traversability;
         *iter_putn_risk=node->plane_->geometric_traversability;
         *iter_lesta_probability=node->plane_->lesta_probability;
+        *iter_lesta_risk=1.0f-node->plane_->lesta_probability;
         *iter_lesta_observed=node->plane_->has_lesta_probability?1.0f:0.0f;
         *iter_lesta_traversable=node->plane_->lesta_traversable?1.0f:0.0f;
 
@@ -777,6 +780,7 @@ void PFRRTStar::pubFusedTraversabilityCloud(Publisher* fused_traversability_clou
         ++iter_fused_risk;
         ++iter_putn_risk;
         ++iter_lesta_probability;
+        ++iter_lesta_risk;
         ++iter_lesta_observed;
         ++iter_lesta_traversable;
     }
