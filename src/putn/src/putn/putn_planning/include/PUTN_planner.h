@@ -21,6 +21,7 @@ public:
     ros::Publisher* tree_vis_pub_=NULL;
     ros::Publisher* goal_vis_pub_=NULL;
     ros::Publisher* tree_tra_pub_=NULL;
+    ros::Publisher* fused_traversability_cloud_pub_=NULL;
 
     PFRRTStar();
     PFRRTStar(const double &height,World* world);//Input the height of the robot center,and the array of grid map.
@@ -200,6 +201,8 @@ protected:
     bool isTraversabilityAcceptable(const Node* node) const;
 
     void pubTraversabilityOfTree(ros::Publisher* tree_tra_pub);
+
+    void pubFusedTraversabilityCloud(ros::Publisher* fused_traversability_cloud_pub);
 };
 }
 }

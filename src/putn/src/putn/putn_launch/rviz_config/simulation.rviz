@@ -334,6 +334,36 @@ Visualization Manager:
       Queue Size: 100
       Value: true
     - Alpha: 1
+      Autocompute Intensity Bounds: false
+      Autocompute Value Bounds:
+        Max Value: 1
+        Min Value: 0
+        Value: false
+      Axis: Z
+      Channel Name: fused_risk
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 164; 0; 0
+      Max Intensity: 1
+      Min Color: 186; 189; 182
+      Min Intensity: 0
+      Name: PUTN Fused Traversability
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.18000000715255737
+      Style: Spheres
+      Topic: /global_planning_node/fused_traversability_cloud
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
+    - Alpha: 1
       Buffer Length: 1
       Class: rviz/Path
       Color: 25; 255; 0

@@ -1,4 +1,5 @@
 #include "PUTN_planner.h"
+#include <sensor_msgs/point_cloud2_iterator.h>
 #include <std_msgs/Float32MultiArray.h>
 #include <random>
 
@@ -699,6 +700,7 @@ Path PFRRTStar::planner(const int &max_iter,const double &max_time)
 
     visTree(tree_,tree_vis_pub_);
     pubTraversabilityOfTree(tree_tra_pub_);
+    pubFusedTraversabilityCloud(fused_traversability_cloud_pub_);
     
     return path_;
 }
@@ -715,4 +717,69 @@ void PFRRTStar::pubTraversabilityOfTree(Publisher* tree_tra_pub)
         msg.data.push_back(node->plane_->traversability);
     }
     tree_tra_pub->publish(msg);
+}
+
+void PFRRTStar::pubFusedTraversabilityCloud(Publisher* fused_traversability_cloud_pub)
+{
+    if(fused_traversability_cloud_pub==NULL) return;
+
+    size_t valid_node_num=0;
+    for(const auto&node:tree_)
+    {
+        if(node!=NULL && node->plane_!=NULL) valid_node_num++;
+    }
+
+    sensor_msgs::PointCloud2 msg;
+    msg.header.frame_id="world";
+    msg.header.stamp=ros::Time::now();
+    msg.height=1;
+    msg.width=valid_node_num;
+    msg.is_bigendian=false;
+    msg.is_dense=false;
+
+    sensor_msgs::PointCloud2Modifier modifier(msg);
+    modifier.setPointCloud2Fields(8,
+                                  "x",1,sensor_msgs::PointField::FLOAT32,
+                                  "y",1,sensor_msgs::PointField::FLOAT32,
+                                  "z",1,sensor_msgs::PointField::FLOAT32,
+                                  "fused_risk",1,sensor_msgs::PointField::FLOAT32,
+                                  "putn_risk",1,sensor_msgs::PointField::FLOAT32,
+                                  "lesta_probability",1,sensor_msgs::PointField::FLOAT32,
+                                  "lesta_observed",1,sensor_msgs::PointField::FLOAT32,
+                                  "lesta_traversable",1,sensor_msgs::PointField::FLOAT32);
+    modifier.resize(valid_node_num);
+
+    sensor_msgs::PointCloud2Iterator<float> iter_x(msg,"x");
+    sensor_msgs::PointCloud2Iterator<float> iter_y(msg,"y");
+    sensor_msgs::PointCloud2Iterator<float> iter_z(msg,"z");
+    sensor_msgs::PointCloud2Iterator<float> iter_fused_risk(msg,"fused_risk");
+    sensor_msgs::PointCloud2Iterator<float> iter_putn_risk(msg,"putn_risk");
+    sensor_msgs::PointCloud2Iterator<float> iter_lesta_probability(msg,"lesta_probability");
+    sensor_msgs::PointCloud2Iterator<float> iter_lesta_observed(msg,"lesta_observed");
+    sensor_msgs::PointCloud2Iterator<float> iter_lesta_traversable(msg,"lesta_traversable");
+
+    for(const auto&node:tree_)
+    {
+        if(node==NULL || node->plane_==NULL) continue;
+
+        *iter_x=static_cast<float>(node->position_(0));
+        *iter_y=static_cast<float>(node->position_(1));
+        *iter_z=static_cast<float>(node->position_(2));
+        *iter_fused_risk=node->plane_->traversability;
+        *iter_putn_risk=node->plane_->geometric_traversability;
+        *iter_lesta_probability=node->plane_->lesta_probability;
+        *iter_lesta_observed=node->plane_->has_lesta_probability?1.0f:0.0f;
+        *iter_lesta_traversable=node->plane_->lesta_traversable?1.0f:0.0f;
+
+        ++iter_x;
+        ++iter_y;
+        ++iter_z;
+        ++iter_fused_risk;
+        ++iter_putn_risk;
+        ++iter_lesta_probability;
+        ++iter_lesta_observed;
+        ++iter_lesta_traversable;
+    }
+
+    fused_traversability_cloud_pub->publish(msg);
 }

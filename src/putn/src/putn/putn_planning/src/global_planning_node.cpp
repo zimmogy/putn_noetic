@@ -29,6 +29,7 @@ ros::Publisher surf_vis_pub;
 ros::Publisher tree_vis_pub;
 ros::Publisher path_interpolation_pub;
 ros::Publisher tree_tra_pub;
+ros::Publisher fused_traversability_cloud_pub;
 
 // indicate whether the robot has a moving goal
 bool has_goal = false;
@@ -261,6 +262,7 @@ int main(int argc, char** argv)
   surf_vis_pub = nh.advertise<sensor_msgs::PointCloud2>("surf_vis", 100);
   tree_vis_pub = nh.advertise<visualization_msgs::Marker>("tree_vis", 1);
   tree_tra_pub = nh.advertise<std_msgs::Float32MultiArray>("tree_tra", 1);
+  fused_traversability_cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("fused_traversability_cloud", 1);
   path_interpolation_pub = nh.advertise<std_msgs::Float32MultiArray>("global_path", 1000);
 
   nh.param("map/resolution", resolution, 0.1);
@@ -309,6 +311,7 @@ int main(int argc, char** argv)
   pf_rrt_star->goal_vis_pub_ = &goal_vis_pub;
   pf_rrt_star->tree_vis_pub_ = &tree_vis_pub;
   pf_rrt_star->tree_tra_pub_ = &tree_tra_pub;
+  pf_rrt_star->fused_traversability_cloud_pub_ = &fused_traversability_cloud_pub;
 
   tf::TransformListener listener;
 
