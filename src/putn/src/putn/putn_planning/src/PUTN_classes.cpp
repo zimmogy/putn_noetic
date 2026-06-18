@@ -290,7 +290,7 @@ bool World::queryLeSTATraversability(const Vector2d &position,float* probability
 
     bool has_probability=false;
     if(probability!=NULL && lesta_traversability_map_.exists(lesta_traversability_arg_.probability_layer) &&
-       !lesta_traversability_map_.isEmptyAt(lesta_traversability_arg_.probability_layer,index))
+       lesta_traversability_map_.isValid(index,lesta_traversability_arg_.probability_layer))
     {
         *probability=lesta_traversability_map_.at(lesta_traversability_arg_.probability_layer,index);
         if(*probability<0.0f) *probability=0.0f;
@@ -300,7 +300,7 @@ bool World::queryLeSTATraversability(const Vector2d &position,float* probability
 
     bool has_binary=false;
     if(traversable!=NULL && lesta_traversability_map_.exists(lesta_traversability_arg_.binary_layer) &&
-       !lesta_traversability_map_.isEmptyAt(lesta_traversability_arg_.binary_layer,index))
+       lesta_traversability_map_.isValid(index,lesta_traversability_arg_.binary_layer))
     {
         *traversable=lesta_traversability_map_.at(lesta_traversability_arg_.binary_layer,index)>0.5f;
         has_binary=true;
