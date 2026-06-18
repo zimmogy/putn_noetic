@@ -47,6 +47,8 @@ static lesta::FeatureExtractor::Config loadConfig(const ros::NodeHandle &nh) {
 
   lesta::FeatureExtractor::Config cfg;
   nh.param<double>("pca_radius", cfg.pca_radius, 0.2);
+  // 新增：从参数服务器读取 grid_re, 默认值为 0.1
+  nh.param<double>("grid_res", cfg.grid_res, 0.1);
 
   return cfg;
 }
@@ -59,9 +61,6 @@ static lesta::LabelGenerator::Config loadConfig(const ros::NodeHandle &nh) {
   lesta::LabelGenerator::Config cfg;
   nh.param<double>("footprint_radius", cfg.footprint_radius, 0.5);
   nh.param<double>("max_traversable_step", cfg.max_traversable_step, 0.1);
-  // New parameter for visual cost threshold and fatal step, default set to 0.3, 0.6
-  nh.param<double>("max_traversable_visual_cost", cfg.max_traversable_visual_cost, 0.3);
-  nh.param<double>("fatal_step_threshold", cfg.fatal_step_threshold, 0.6);
 
   return cfg;
 }

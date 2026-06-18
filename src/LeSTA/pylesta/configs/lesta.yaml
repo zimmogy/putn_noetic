@@ -7,33 +7,37 @@ DATASET:
     - slope
     - roughness
     - curvature
-    - visual_cost # [new] Vision-priori cost feature
     # - variance
+    # - intensity_mean
+    # - intensity_var
+    - sparsity
   feature_weights:
     step: 1.0
     slope: 1.0
     roughness: 1.0
     curvature: 1.0
-    visual_cost: 1.0 # [new] cross-modal feature weight, can be fine-tuned baesd on ablation studies
-    # variance: 1.0
+    variance: 1.0
+    intensity_mean: 1.0
+    intensity_var: 1.0
+    sparsity: 1.0
   label_field: "traversability_label"
   skip_dataset_normalization: &use_normalization_layer true
 
 MODEL:
   type: "MLP"
   input_dim: 5
-  hidden_dims: [12, 4]
+  hidden_dims: [32, 16]
   output_dim: 1
-  dropout_rate: 0.3
+  dropout_rate: 0.7 # 0.2
   use_normalization_layer: *use_normalization_layer
 
 TRAINER:
-  device: "cuda" # ["cpu", "cuda"]
+  device: "cpu" # ["cpu", "cuda"]
 
   ## Self-training
   max_iterations: 3
-  confidence_threshold: 0.95 # Low value will cause noisy pseudo-labels
-  min_pseudo_labeling_ratio: 0.1 # Termination condition
+  confidence_threshold: 0.90 # Low value will cause noisy pseudo-labels
+  min_pseudo_labeling_ratio: 0.05 # Termination condition
 
   ## Training
   num_epochs: 4
@@ -49,13 +53,14 @@ TRAINER:
   namespace: "LeSTA"
 
 LOSS:
-  type: "risk_sensitive_loss" # ["risk_sensitive_loss", "instance_weighted_loss", "bce_loss"]
-  entropy_coefficient: 0.1
+  type: "uncertainty_aware_loss" # ["risk_sensitive_loss", "instance_weighted_loss", "bce_loss", "uncertainty_aware_loss"]
+  entropy_coefficient: 0.01
 
 OPTIMIZER:
   type: "Adam"
-  learning_rate: 0.001
+  learning_rate: 0.0001 # 0.001
   Adam_beta1: 0.9
   Adam_beta2: 0.999
+  weight_decay: 0.001
   scheduler: "exponential" # ["none", "step", "exponential", "plateau"]
   scheduler_gamma: 0.98 # 0.1 for step, plateau

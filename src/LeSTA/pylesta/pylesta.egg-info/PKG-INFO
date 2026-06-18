@@ -1,11 +1,8 @@
-Metadata-Version: 1.2
+Metadata-Version: 2.1
 Name: pylesta
 Version: 0.2.0
 Summary: Training a risk-aware self-supervised traversability model with navigation experiences of mobile robots
 Home-page: https://github.com/Ikhyeon-Cho/LeSTA
 Author: Ikhyeon Cho
 Author-email: tre0430@korea.ac.kr
-License: UNKNOWN
-Description: UNKNOWN
-Platform: UNKNOWN
 Requires-Python: >=3.6

@@ -5,13 +5,7 @@ add_compile_options(-std=c++17)
 # LibTorch setup
 find_package(Torch REQUIRED PATHS /opt/libtorch)
 
-# [加入 Torch 的 CXX flags,防止因 CXX11 ABI 导致链接错误]
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
-
 find_package(PCL REQUIRED)
-
-find_package(OpenCV REQUIRED)
-
 find_package(catkin REQUIRED COMPONENTS
     height_mapping_core
     roscpp
@@ -19,9 +13,6 @@ find_package(catkin REQUIRED COMPONENTS
     pcl_conversions
     grid_map_ros
     message_generation
-    cv_bridge
-    sensor_msgs
-    message_filters
 )
 
 add_service_files(
@@ -44,10 +35,6 @@ catkin_package(
     tf2_ros
     pcl_conversions
     grid_map_ros
-    cv_bridge
-    sensor_msgs
-    message_filters
-    message_runtime
 )
 
 
@@ -61,7 +48,6 @@ include_directories(
   ${PCL_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
   ${TORCH_INCLUDE_DIRS}
-  ${OpenCV_INCLUDE_DIRS}
 )
 
 # Node: Label generation
@@ -75,11 +61,7 @@ add_executable(label_generation_node
 target_link_libraries(label_generation_node
   ${PCL_LIBRARIES}
   ${catkin_LIBRARIES}
-  height_mapping_core
-  ${OpenCV_LIBRARIES}
 )
-# Node: add dependencies to service messages header files
-add_dependencies(label_generation_node height_mapping_core ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 # Node: Traversability prediction
 add_executable(trav_prediction_node
@@ -92,12 +74,8 @@ add_executable(trav_prediction_node
 target_link_libraries(trav_prediction_node
   ${PCL_LIBRARIES}
   ${catkin_LIBRARIES}
-  height_mapping_core
   ${TORCH_LIBRARIES}
-  ${OpenCV_LIBRARIES}
 )
-# Node: add message dependencies
-add_dependencies(trav_prediction_node height_mapping_core ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 # Node: Traversability mapping
 add_executable(trav_mapping_node
@@ -112,8 +90,5 @@ add_executable(trav_mapping_node
 target_link_libraries(trav_mapping_node
   ${PCL_LIBRARIES}
   ${catkin_LIBRARIES}
-  height_mapping_core
   ${TORCH_LIBRARIES}
-  ${OpenCV_LIBRARIES}
 )
-add_dependencies(trav_mapping_node height_mapping_core ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})

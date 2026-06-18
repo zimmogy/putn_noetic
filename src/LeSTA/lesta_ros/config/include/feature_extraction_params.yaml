@@ -1,2 +1,3 @@
 feature_extractor:
-  pca_radius: 0.2                  # [meter], radius for terrain feature extraction
+  pca_radius: 0.5                  # [meter], radius for terrain feature extraction
+  grid_res: 0.1.                   # [meter], resolution for local vacancy grid mapping (sparsity calculation)

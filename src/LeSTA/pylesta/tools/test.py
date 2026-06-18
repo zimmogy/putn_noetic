@@ -3,7 +3,7 @@ import torch
 from utils.param import yaml
 from utils.pytorch import machine
 from lesta.api.model import TraversabilityNetwork
-
+from utils.pytorch.evaluation import ConfusionMatrixTracker  # [新增] 引入评估模块
 
 def main(args):
     CFG_PATH = args.config
@@ -50,49 +50,63 @@ def main(args):
 
     # Define your samples manually - adjust values and number of samples as needed
     manual_samples = [
-        [0.012542605, 1.5994414, 0.0013297237,
-            5.4580851e-05],  # Sample 1: traversable
-        # Sample 2: non-traversable
-        [0.73471355, 65.826698, 0.065527156, 0.044856552],
-        [0.010115743, 1.2940117, 0.0012869993,
-            5.113686e-05],   # Sample 3: traversable
-        [0.9, 10, 0.9, 0.1],                                    # Sample 4
-        [0.05, 0.8, 0.05, 0.01]                                 # Sample 5
+        [0.012542605, 1.5994414, 0.0013297237, 5.4580851e-05],  # Sample 1: traversable
+        [0.73471355, 65.826698, 0.065527156, 0.044856552],      # Sample 2: non-traversable
+        [0.010115743, 1.2940117, 0.0012869993, 5.113686e-05],   # Sample 3: traversable
+        [0.9, 10, 0.9, 0.1],                                    # Sample 4: non-traversable (Assumed)
+        [0.05, 0.8, 0.05, 0.01]                                 # Sample 5: traversable (Assumed)
     ]
+    
+    # [新增] 为样本提供对应的真实标签 Ground Truth (1: Traversable, 0: Non-traversable)
+    manual_targets = [1, 0, 1, 0, 1] 
 
     # Convert to tensor and move to device
     features = torch.tensor(manual_samples, dtype=torch.float32).to(device)
+    targets = torch.tensor(manual_targets, dtype=torch.float32).to(device) # [新增]
     num_samples = features.shape[0]
-    print(
-        f'Using {num_samples} manually defined samples with {input_dim} features')
+    
+    print(f'Using {num_samples} manually defined samples with {input_dim} features')
 
-    # Display sample features
-    print("Sample features:")
-    print(features)
+    # [新增] 初始化评估器 (类别为 2: 0 和 1)
+    evaluator = ConfusionMatrixTracker(num_classes=2)
 
     # Perform inference
     print('=> Running inference...')
     with torch.no_grad():
         outputs = model(features)
         probabilities = torch.sigmoid(outputs).squeeze()
+        # Ensure prediction format matches target format (1D tensor)
+        if len(probabilities.shape) == 0:
+            probabilities = probabilities.unsqueeze(0)
         predictions = (probabilities >= 0.5).int()
 
+    # [新增] 将预测结果与真实结果送入评估器
+    evaluator.add_batch({'trav_pred': predictions}, {'trav_pred': targets})
+
     # Display results
-    print('\n=> Results:')
+    print('\n=> Results Detail:')
     for i in range(num_samples):
         print(f"Sample {i+1}:")
         print(f"  Features: {features[i].cpu().numpy()}")
         print(f"  Probability: {probabilities[i].item():.4f}")
-        print(
-            f"  Prediction: {'Traversable' if predictions[i].item() == 1 else 'Non-traversable'}")
+        pred_label = 'Traversable' if predictions[i].item() == 1 else 'Non-traversable'
+        gt_label = 'Traversable' if manual_targets[i] == 1 else 'Non-traversable'
+        print(f"  Prediction: {pred_label} (Ground Truth: {gt_label})")
 
-    print(f'\033[32m====== Testing completed ======\033[0m')
+    # [新增] 打印评估指标 (完美对齐论文表格格式)
+    metrics = evaluator.get_metrics('trav_pred')
+    print("\n" + "="*55)
+    print(f"{'Method':<20} | {'Pr. [%]':<8} | {'Re. [%]':<8} | {'Spe. [%]':<8} | {'F1':<6}")
+    print("-" * 55)
+    print(f"{'Manual Test Data':<20} | {metrics['Precision']*100:>7.1f} | {metrics['Recall']*100:>7.1f} | {metrics['Specificity']*100:>8.1f} | {metrics['F1']:>6.4f}")
+    print("=" * 55)
 
+    print(f'\n\033[32m====== Testing completed ======\033[0m')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str,
-                        default='lesta_training/configs/lesta.yaml')
+                        default='configs/lesta.yaml')
     parser.add_argument('--checkpoint', type=str,
                         default='checkpoints/epoch_best.pt')
     parser.add_argument('--device', type=str,

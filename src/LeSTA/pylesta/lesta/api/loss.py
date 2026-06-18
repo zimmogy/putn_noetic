@@ -7,6 +7,7 @@ File: lesta/api/loss.py
 from ..core.loss_fns import BCELoss
 from ..core.loss_fns import InstanceWeightedLoss
 from ..core.loss_fns import InstanceWeightedBCEWithLogitLossAndEntropy
+from ..core.loss_fns import UncertaintyAwareLossWithEntropy
 
 
 class LossFactory:
@@ -18,6 +19,7 @@ class LossFactory:
         'bce_loss': BCELoss,
         'instance_weighted_loss': InstanceWeightedLoss,
         'risk_sensitive_loss': InstanceWeightedBCEWithLogitLossAndEntropy,
+        'uncertainty_aware_loss': UncertaintyAwareLossWithEntropy,
     }
 
     def __init__(self, cfg: dict, dataset=None):

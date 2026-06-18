@@ -1,10 +1,6 @@
 import argparse
-import sys
-import os
 
-# 强制将 train.py 的父目录 (即 pylesta) 加入环境变量的最高优先级
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
+import torch
 from utils.param import yaml
 from utils.pytorch import seed, machine
 from utils.pytorch.optimizer import TrainingOptimizer
@@ -57,6 +53,12 @@ def main(args):
     print('=> Initializing trainer...')
     print('=> Using device:', device)
     criterion = LossFactory(cfg=LOSS_CFG)
+    # ======== [新增：激活正样本偏袒权重] ========
+    if LOSS_CFG['type'] in ['bce_loss', 'uncertainty_aware_loss', 'instance_weighted_loss']:
+        pos_weight = train_dataset.get_pos_weight()
+        criterion.set_pos_weight(pos_weight.to(device))
+        print(f'=> Applied Positive Weight (pos_weight): {pos_weight.item():.4f}')
+    # ==========================================
     optim = TrainingOptimizer(model=net, cfg=OPTIMIZER_CFG)
 
     # Create and run trainer
@@ -67,7 +69,8 @@ def main(args):
         optimizer=optim.optimizer,
         scheduler=optim.scheduler,
         device=device,
-        cfg=TRAINER_CFG
+        cfg=TRAINER_CFG,
+        loss_type=LOSS_CFG['type'] # [新增] 把loss_type 传给trainer进行逻辑判断
     )
 
     print('=> Start training:')

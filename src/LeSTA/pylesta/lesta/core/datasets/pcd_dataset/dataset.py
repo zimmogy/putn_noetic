@@ -25,8 +25,6 @@ class PCDDataset(PCDDatasetBase):
         """Get item at index. Returns pytorch tensors"""
 
         features, label = self.feature_vectors[idx], self.labels[idx]
-        if not self.skip_normalization:
-            features = self._normalize_features(features)
 
         # Convert to pytorch tensors
         features = torch.from_numpy(features).float()
@@ -52,8 +50,28 @@ class PCDDataset(PCDDatasetBase):
 
         self.feature_vectors = self.points[:, feat_field_indices]
 
-        # [repair] 
-        self.feature_vectors = np.nan_to_num(self.feature_vectors, nan=0.0)
+        # =========== 【新增核心修复代码】 ==============
+        # 针对长尾分布，进行 99% 分位数截断(clipping)，消除极值对 Z-score 的 破坏
+        try:
+            # 找到强度特征的索引
+            mean_idx = self.feature_fields.index('intensity_mean')
+            var_idx = self.feature_fields.index('intensity_var')
+            
+            # 1. 计算 99% 分位数的上限值
+            mean_p99 = np.percentile(self.feature_vectors[:, mean_idx], 99.0)
+            var_p99 = np.percentile(self.feature_vectors[:, var_idx], 99.0)
+            
+            # 2. 将所有大于该上限的值，强行压制到上限值（截断极值）
+            self.feature_vectors[:, mean_idx] = np.clip(self.feature_vectors[:, mean_idx], a_min=0.0, a_max=mean_p99)
+            self.feature_vectors[:, var_idx] = np.clip(self.feature_vectors[:, var_idx], a_min=0.0, a_max=var_p99)
+            
+            
+            print(f"\n[Dataset] 已对 Intensity 特征进行 99% 截断保护！")
+            print(f"[Dataset] Mean 截断上限: {mean_p99:.6f}, Var 截断上限: {var_p99:.6f}\n")
+        except ValueError:
+            pass # 如果配置文件中没有使用这俩特征，则安全跳过
+        # ==========================================================
+
         # Calculate feature means and stds
         self._calc_normalization_constants()
 
@@ -105,7 +123,7 @@ class PCDDataset(PCDDatasetBase):
 
     def _get_labeled_indices(self):
         """Get indices of labeled points (labels 0 or 1)."""
-        return np.where((self.labels >= 0) & (self.labels <= 1))[0]
+        return np.where((self.labels == 0) | (self.labels == 1))[0]
 
     def _get_unlabeled_indices(self):
         """Get indices of unlabeled points (labels -1)."""

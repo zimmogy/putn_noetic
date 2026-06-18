@@ -3,32 +3,34 @@ node:
   map_publish_rate: 1.0        # [Hz], For visualization
   scan_filter_range: 6.0       # [meter], Distant points are noisy and not useful for mapping
   visualize_3d_scan: true      # [bool], Visualize the 3D scan mapping in rviz
-  remove_backpoints: false      # [bool], Remove remoter points
+  remove_backpoints: true      # [bool], Remove remoter points
   debug_mode: false
 
 frame_id:
   robot_frame: "base_link"
-  map_frame: &map_frame "odom" 
+  map_frame: &map_frame "map" 
 
 height_mapper:
   estimator_type: "KalmanFilter"   # ["StatMean", "KalmanFilter", "MovingAverage"]
   frame_id: *map_frame
-  map_length_x: 600.0          # [meter]
-  map_length_y: 400.0          # [meter], Adjust these values based on the mapping areas
+  map_length_x: 500.0          # [meter]
+  map_length_y: 500.0          # [meter], Adjust these values based on the mapping areas
   grid_resolution: 0.1         # [meter]
-  min_height_threshold: -2.5   # [meter]
-  max_height_threshold: 1.5    # [meter]
+  min_height_threshold: -0.5   # [meter]
+  max_height_threshold: 2.0    # [meter]
 
 traversability_mapper:
-  model_path: "/home/whr/Data/mlp_pt/epoch_best.pt"
-  input_dimension: 5
+  model_path: "/home/whr/下载/epoch_best.pt"
+  input_dimension: 8
   feature_fields:
     - step
     - slope
     - roughness
     - curvature
-    - visual_cost # [new] Vision-priori cost feature
-    # - elevation_variance
+    - variance
+    - intensity_mean
+    - intensity_var
+    - sparsity
   binary_threshold: 0.5
   use_log_odds_update: true    # [bool], Use log odds update
   learning_rate: 0.7           # [float], Reduces overconfidence

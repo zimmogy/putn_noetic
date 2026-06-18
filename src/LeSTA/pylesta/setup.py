@@ -1,6 +1,6 @@
 # setup.py
 
-from setuptools import setup, find_packages
+from setuptools import setup, find_namespace_packages
 
 setup(
     name="pylesta",
@@ -8,7 +8,7 @@ setup(
     author="Ikhyeon Cho",
     author_email="tre0430@korea.ac.kr",
     url="https://github.com/Ikhyeon-Cho/LeSTA",
-    packages=find_packages(),
+    packages=find_namespace_packages(),
     install_requires=[],  # requirements.txt
     description="Training a risk-aware self-supervised traversability model with navigation experiences of mobile robots",
     python_requires='>=3.6',

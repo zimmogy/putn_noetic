@@ -32,6 +32,8 @@ class MLPClassifier(nn.Module):
                  cfg=None):
         super(MLPClassifier, self).__init__()
 
+        feature_means = None
+        feature_stds = None
         if cfg is not None:
             input_dim = cfg['input_dim']
             hidden_dims = cfg['hidden_dims']
@@ -77,5 +79,4 @@ class MLPClassifier(nn.Module):
     def forward(self, x):
         if self.feature_normalizer is not None:
             x = self.feature_normalizer(x)
-
         return self.network(x)

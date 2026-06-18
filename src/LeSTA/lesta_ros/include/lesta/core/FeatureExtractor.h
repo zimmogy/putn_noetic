@@ -18,6 +18,7 @@ class FeatureExtractor {
 public:
   struct Config {
     double pca_radius;
+    double grid_res;
   } cfg;
 
   FeatureExtractor(const Config &cfg);

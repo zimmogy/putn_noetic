@@ -8,20 +8,17 @@ node:
 
 frame_id:
   robot_frame: "base_link"
-  map_frame: &map_frame "odom"
+  map_frame: &map_frame "map"
 
 height_mapper:
   estimator_type: "KalmanFilter"   # ["StatMean", "KalmanFilter", "MovingAverage"]
   frame_id: *map_frame
-  map_length_x: 600.0              # [meter]
-  map_length_y: 300.0              # [meter], Adjust these values based on the labeling areas
+  map_length_x: 500.0              # [meter]
+  map_length_y: 500.0              # [meter], Adjust these values based on the labeling areas
   grid_resolution: 0.1             # [meter]
   min_height_threshold: -0.5       # [meter]
-  max_height_threshold: 1.5        # [meter]
+  max_height_threshold: 2.0        # [meter]
 
 label_generator:
-  footprint_radius: 0.8            # [meter], Circular footprint (within radius = positive label)
+  footprint_radius: 0.6            # [meter], Circular footprint (within radius = positive label)
   max_traversable_step: 0.3        # [meter], Step height difference (higher = negative label)
-  # [new] Vision-priori safety thresholds
-  max_traversable_visual_cost: 0.3
-  fatal_step_threshold: 0.6

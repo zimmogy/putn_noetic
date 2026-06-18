@@ -13,12 +13,6 @@
 
 #include "common/ros/common.h"
 #include "lesta/core/core.h"
-// 新增视觉模块所用的头文件
-#include <message_filters/subscriber.h>
-#include <message_filters/synchronizer.h>
-#include <message_filters/sync_policies/approximate_time.h>
-#include <sensor_msgs/Image.h>
-#include <opencv2/opencv.hpp> // [新增] 直接使用标准 OpenCV
 
 namespace lesta_ros {
 
@@ -30,6 +24,7 @@ public:
     double map_pub_rate;
     bool remove_backpoints;
     bool debug_mode;
+    double self_filter_radius; // 新增本体过滤半径
   } cfg_;
 
   TravPredictionNode();
@@ -68,19 +63,12 @@ private:
   ros::NodeHandle nh_;
 
   // Subscribers & Publishers
-  // ros::Subscriber sub_lidarscan_;
+  ros::Subscriber sub_lidarscan_;
   ros::Publisher pub_downsampled_scan_;
   ros::Publisher pub_filtered_scan_;
   ros::Publisher pub_rasterized_scan_;
   ros::Publisher pub_heightmap_;
   ros::Publisher pub_travmap_;
-  // 新增同步器成员
-  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::PointCloud2, sensor_msgs::Image> SyncPolicy;
-  message_filters::Subscriber<sensor_msgs::PointCloud2> sub_lidarscan_sync_;
-  message_filters::Subscriber<sensor_msgs::Image> sub_visual_cost_sync_;
-  std::unique_ptr<message_filters::Synchronizer<SyncPolicy>> sync_;
-  
-  void syncedCallback(const sensor_msgs::PointCloud2ConstPtr& scan_msg, const sensor_msgs::ImageConstPtr& cost_img_msg);
 
   // Timers
   ros::Timer pose_update_timer_;

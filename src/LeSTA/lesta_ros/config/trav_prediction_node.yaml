@@ -2,30 +2,33 @@ node:
   lidarscan_topic: "/os1_cloud_node/points"
   map_publish_rate: 10.0             # [Hz]
   pose_update_rate: 10.0             # [Hz]
-  remove_backpoints: false            # [bool], Remove remoter points
+  remove_backpoints: true            # [bool], Remove remoter points
   debug_mode: false
+  self_filter_radius: 0.6 # 新增：过滤机器人本体半径（单位：米）
 
 frame_id:
   robot_frame: "base_link"
-  map_frame: &map_frame "odom" 
+  map_frame: &map_frame "map" 
 
 height_mapper:
   estimator_type: "KalmanFilter"   # ["StatMean", "KalmanFilter", "MovingAverage"]
   frame_id: *map_frame
-  map_length_x: 10.0                 # [meter]
-  map_length_y: 10.0                 # [meter]
+  map_length_x: 15.0                 # [meter]
+  map_length_y: 15.0                 # [meter]
   grid_resolution: 0.1               # [meter]
-  min_height_threshold: -5.5         # [meter]
-  max_height_threshold: 1.5          # [meter]
+  min_height_threshold: -0.5         # [meter]
+  max_height_threshold: 2.0          # [meter]
 
 traversability_network:
-  model_path: "/home/whr/Data/mlp_pt/epoch_best.pt"
-  input_dimension: 5
+  model_path: "/home/whr/下载/epoch_best.pt"
+  input_dimension: 8
   feature_fields:
     - step
     - slope
     - roughness
     - curvature
-    - visual_cost # [new] Vision-priori cost feature
-    # - elevation_variance
+    - variance
+    - intensity_mean
+    - intensity_var
+    - sparsity
   binary_threshold: 0.5

@@ -33,11 +33,13 @@ class PCDDatasetBase(Dataset):
         label_field_idx = self.point_fields.index(self.label_field)
         self.labels = self.points[:, label_field_idx]
 
-        # Remove label field from point fields
-        self.point_fields = [
-            f for f in self.point_fields if f != self.label_field]
+        # 先获取剔除 label 后的【原始列索引】！
         point_field_indices = [
             i for i, f in enumerate(self.point_fields) if f != self.label_field]
+        
+        # 然后再安全地更新名称列表和数据矩阵
+        self.point_fields = [
+            f for f in self.point_fields if f != self.label_field]
         self.points = self.points[:, point_field_indices]
 
     def __len__(self):

@@ -87,7 +87,7 @@ void TraversabilityEstimator::estimateTraversabilityImpl(
   std::vector<grid_map::Index> valid_indices;
   features.reserve(measured_indices.size());
   valid_indices.reserve(measured_indices.size());
-/* 原来版本的检查特征维度是否齐备
+
   for (const auto &index : measured_indices) {
     // Check if all required features are valid
     bool all_feature_values_valid = true;
@@ -99,42 +99,46 @@ void TraversabilityEstimator::estimateTraversabilityImpl(
     }
     if (!all_feature_values_valid)
       continue;
-*/
-  // 修改特征填充逻辑，在视野盲区采用后备机制，赋予盲区的visual_cost一个默认的惩罚值
-  // 使用剩下的4维几何特征进行推理
 
-  for (const auto &index : measured_indices) {
-  // Create feature vector with the correct dimension
+    // Create feature vector with the correct dimension
     Eigen::VectorXf feature(cfg.feature_fields.size());
-    bool all_feature_values_valid = true;
+    bool has_nan_or_inf = false;
 
-    // 整合特征校验与赋值逻辑
+    // Fill feature vector based on configured fields
     for (size_t i = 0; i < cfg.feature_fields.size(); i++) {
       const std::string &field_name = cfg.feature_fields[i];
-      
-      if (map.isEmptyAt(featurefield_to_layer_[field_name], index)) {
-        // [新增] 如果是视觉成本层缺失 (FOV盲区)，赋予默认中性值
-        if (field_name == layers::Visual::COST) {
-          feature(i) = 0.3f; // 注意：此默认值应与您训练网络时采用的 Masking 值一致
-        } else {
-          // 如果是几何特征缺失，则判定为无效网格
-          all_feature_values_valid = false;
+      float raw_value = map.at(featurefield_to_layer_[field_name], index);
+
+      // Block NaN/Inf corruption before it reaches LibTorch
+      if (std::isnan(raw_value) || std::isinf(raw_value)) {
+          has_nan_or_inf = true;
           break;
-        }
-      } else {
-        feature(i) = map.at(featurefield_to_layer_[field_name], index);
       }
+
+      // ================= [部署端对齐代码] =================
+      if (field_name.find("intensity_mean") != std::string::npos) {
+          raw_value = std::min(raw_value, 1.0f);      
+      } else if (field_name.find("intensity_var") != std::string::npos) {
+          raw_value = std::min(raw_value, 0.008476f); 
+      }
+      // ====================================================
+
+      feature(i) = raw_value;
     }
 
-    if (!all_feature_values_valid){
-      continue;}
+    if (has_nan_or_inf) continue;
+
     features.push_back(std::move(feature));
     valid_indices.push_back(index);
   }
 
   // Perform batch inference if we have valid cells
   if (!features.empty()) {
+    std::cout << "\n\033[1;36m[DEBUG] Valid cells: " << features.size() << " | Sample Feature [0]: " << features[0].transpose() << "\033[0m" << std::endl;
+
     std::vector<float> predictions = network_.inference(features);
+
+    std::cout << "\033[1;35m[DEBUG] Sample Logit [0]: " << predictions[0] << " | Sigmoid Probability: " << sigmoid(predictions[0]) << "\033[0m\n" << std::endl;
 
     // Update map with predictions
     for (size_t i = 0; i < valid_indices.size(); ++i) {
@@ -149,7 +153,6 @@ void TraversabilityEstimator::estimateTraversabilityImpl(
     }
   }
 }
-
 void TraversabilityEstimator::ensureTraversabilityLayers(HeightMap &map) {
 
   map.addLayer(layers::Traversability::PROBABILITY);

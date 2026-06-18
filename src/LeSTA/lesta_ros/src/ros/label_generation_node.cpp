@@ -16,7 +16,6 @@
 #include <sensor_msgs/point_cloud2_iterator.h>
 #include <grid_map_ros/GridMapRosConverter.hpp>
 #include <ros/package.h>
-#include <opencv2/opencv.hpp>
 
 namespace lesta_ros {
 
@@ -63,20 +62,10 @@ void LabelGenerationNode::loadConfig(const ros::NodeHandle &nh) {
 
 void LabelGenerationNode::initializePubSubs() {
 
-  // sub_lidarscan_ = nh_.subscribe(cfg_.lidarscan_topic,
-  //                                1,
-  //                                &LabelGenerationNode::lidarScanCallback,
-  //                                this);
-  // [new] Synchronize LiDAR scan and visual cost map
-  sub_lidarscan_sync_.subscribe(nh_, cfg_.lidarscan_topic, 100);
-  sub_visual_cost_sync_.subscribe(nh_, "/visual_cost_map", 100);
-  sync_ = std::make_unique<message_filters::Synchronizer<SyncPolicy>>(SyncPolicy(100), sub_lidarscan_sync_, sub_visual_cost_sync_);
-  sync_->registerCallback(boost::bind(&LabelGenerationNode::sensorSyncCallback, this, _1, _2));
-
-  // [new] IMU subscriber for soft-label generation
-  sub_imu_ = nh_.subscribe("/vectornav/IMU", 1000, &
-      LabelGenerationNode::imuCallback, this);
-  // ...
+  sub_lidarscan_ = nh_.subscribe(cfg_.lidarscan_topic,
+                                 1,
+                                 &LabelGenerationNode::lidarScanCallback,
+                                 this);
   pub_filtered_scan_ =
       nh_.advertise<sensor_msgs::PointCloud2>("/lesta/label_generation/scan_filtered", 1);
   pub_downsampled_scan_ =
@@ -107,22 +96,18 @@ void LabelGenerationNode::initializeTimers() {
   ros::Duration pose_update_dt(1.0 / cfg_.pose_update_rate);
   ros::Duration map_pub_dt(1.0 / cfg_.map_pub_rate);
 
-  // [new]注释掉足迹定时器，改为在同步回调里直接调用
-  /*
   pose_update_timer_ = nh_.createTimer(pose_update_dt,
                                        &LabelGenerationNode::recordFootprints,
                                        this,
                                        false,
                                        false);
-   */
   map_publish_timer_ = nh_.createTimer(map_pub_dt,
                                        &LabelGenerationNode::publishLabelMap,
                                        this,
                                        false,
                                        false);
 }
-/* original LiDAR callback function
-"""
+
 void LabelGenerationNode::lidarScanCallback(const sensor_msgs::PointCloud2Ptr &msg) {
 
   if (!lidarscan_received_) {
@@ -164,117 +149,6 @@ void LabelGenerationNode::lidarScanCallback(const sensor_msgs::PointCloud2Ptr &m
 }
 
 pcl::PointCloud<Laser>::Ptr
-*/
-// [new] Synchronized callback for LiDAR scan and visual cost map
-// [new] Synchronized callback for LiDAR scan and visual cost map
-void LabelGenerationNode::sensorSyncCallback(const sensor_msgs::PointCloud2ConstPtr &scan_msg,
-                                             const sensor_msgs::ImageConstPtr &cost_msg) {
-  if (!lidarscan_received_) { 
-    lidarscan_received_ = true;
-    frame_id_.sensor = scan_msg->header.frame_id;
-    // pose_update_timer_.start(); // 注释掉，使用强同步足迹
-    map_publish_timer_.start();
-    std::cout << "\033[1;32m[lesta_ros]: Pointcloud & Image Received! Data Generation started...\033[0m\n";
-  }
-
-  geometry_msgs::TransformStamped sensor2base, base2map;
-  if (!tf_.lookupTransform(frame_id_.robot, frame_id_.sensor, sensor2base) ||
-      !tf_.lookupTransform(frame_id_.map, frame_id_.robot, base2map)) {
-    ROS_WARN_THROTTLE(1.0, "[LabelGenerationNode] 等待 TF 树对齐..."); 
-    return;
-  }
-
-  // ==========================================================
-  // 【优化 1】：彻底移除 cv_bridge，使用裸指针内存映射防止 ROS 崩溃
-  // ==========================================================
-  if (cost_msg->encoding != "32FC1") {
-    ROS_ERROR("[LabelGenerationNode] 期待的视觉代价图编码为 '32FC1', 但收到 '%s'", cost_msg->encoding.c_str());
-    return; 
-  }
-  cv::Mat visual_cost_map(cost_msg->height, cost_msg->width, CV_32FC1,
-                          const_cast<uint8_t*>(&cost_msg->data[0]), cost_msg->step);
-  visual_cost_map = visual_cost_map.clone(); // 深拷贝
-
-  // 点云预处理
-  auto scan_raw = boost::make_shared<pcl::PointCloud<Laser>>();
-  pcl::fromROSMsg(*scan_msg, *scan_raw);
-  auto scan_preprocessed = preprocessScan(scan_raw, sensor2base, base2map);
-  if (!scan_preprocessed) return;
-  
-  auto sensor2map = TransformOps::multiplyTransforms(sensor2base, base2map);
-  Eigen::Vector3f sensor_position3d(sensor2map.transform.translation.x,
-                                    sensor2map.transform.translation.y,
-                                    sensor2map.transform.translation.z);
-  
-  // ==========================================================
-  // 【修复 2】：严格遵守 "建图 -> 写入视觉 -> 提取特征 -> 生成标签" 的时序
-  // ==========================================================
-  
-  // 第一步：地形建图
-  auto measured_indices = terrainMapping(scan_preprocessed, sensor_position3d);
-
-  // 第二步：将视觉代价投影并写入 2.5D 栅格 (使用正确的 T_map_to_sensor)
-  Eigen::Quaternionf q(sensor2map.transform.rotation.w, sensor2map.transform.rotation.x,
-                       sensor2map.transform.rotation.y, sensor2map.transform.rotation.z);
-  Eigen::Vector3f t(sensor2map.transform.translation.x, sensor2map.transform.translation.y,
-                    sensor2map.transform.translation.z);
-  Eigen::Matrix4f T_sensor2map = Eigen::Matrix4f::Identity();
-  T_sensor2map.block<3,3>(0,0) = q.toRotationMatrix();
-  T_sensor2map.block<3,1>(0,3) = t;
-  Eigen::Matrix4f T_map_to_sensor = T_sensor2map.inverse();
-
-  mapper_->integrateVisualCost(scan_preprocessed, visual_cost_map, T_map_to_sensor);
-
-  // 第三步：提取包含视觉代价在内的所有特征
-  feature_extractor_->extractFeatures(mapper_->getHeightMap(), measured_indices);
-  
-  // 第四步：生成伪标签 (此时底层的 addObstacles 终于能读到视觉代价了！)
-  label_generator_->addObstacles(mapper_->getHeightMap(), measured_indices);
-
-  // 第五步：利用 IMU 计算足迹软标签 (强同步兜底)
-  grid_map::Position robot_position(base2map.transform.translation.x,
-                                    base2map.transform.translation.y);
-  float current_score = calculateSoftLabel();
-  label_generator_->addFootprint(mapper_->getHeightMap(), robot_position, current_score);
-}
-
-pcl::PointCloud<Laser>::Ptr LabelGenerationNode::preprocessScan(const pcl::PointCloud<Laser>::Ptr &scan_raw,
-                                    const geometry_msgs::TransformStamped &sensor2base,
-                                    const geometry_msgs::TransformStamped &base2map) {
-
-  // 1. Transform pointcloud to base frame
-  auto scan_base = PointCloudOps::applyTransform<Laser>(scan_raw, sensor2base);
-
-  // For visualization: downsample pointcloud
-  auto scan_downsampled = PointCloudOps::downsampleVoxel<Laser>(scan_base, 0.4);
-  publishDownsampledScan(scan_downsampled);
-
-  // 2. Fast height filtering
-  auto scan_preprocessed = boost::make_shared<pcl::PointCloud<Laser>>();
-  mapper_->fastHeightFilter(scan_base, scan_preprocessed);
-
-  // 3. Pass through filter
-  scan_preprocessed =
-      PointCloudOps::passThrough<Laser>(scan_preprocessed, "x", -5.0, 5.0);
-  scan_preprocessed =
-      PointCloudOps::passThrough<Laser>(scan_preprocessed, "y", -5.0, 5.0);
-
-  // (Optional) Remove remoter points
-  if (cfg_.remove_backpoints)
-    scan_preprocessed =
-        PointCloudOps::filterAngle2D<Laser>(scan_preprocessed, -135.0, 135.0);
-
-  // 4. Publish filtered scan
-  publishFilteredScan(scan_preprocessed);
-
-  // 5. Transform pointcloud to map frame
-  scan_preprocessed = PointCloudOps::applyTransform<Laser>(scan_preprocessed, base2map);
-
-  if (scan_preprocessed->empty())
-    return nullptr;
-  return scan_preprocessed;
-}
-/*
 LabelGenerationNode::preprocessScan(const pcl::PointCloud<Laser>::Ptr &scan_raw,
                                     const geometry_msgs::TransformStamped &sensor2base,
                                     const geometry_msgs::TransformStamped &base2map) {
@@ -299,7 +173,7 @@ LabelGenerationNode::preprocessScan(const pcl::PointCloud<Laser>::Ptr &scan_raw,
   // (Optional) Remove remoter points
   if (cfg_.remove_backpoints)
     scan_preprocessed =
-        PointCloudOps::filterAngle2D<Laser>(scan_preprocessed, -135.0, 135.0);
+        PointCloudOps::filterAngle2D<Laser>(scan_preprocessed, -105.0, 105.0);
 
   // 4. Publish filtered scan
   publishFilteredScan(scan_preprocessed);
@@ -311,7 +185,7 @@ LabelGenerationNode::preprocessScan(const pcl::PointCloud<Laser>::Ptr &scan_raw,
     return nullptr;
   return scan_preprocessed;
 }
-*/
+
 std::vector<grid_map::Index>
 LabelGenerationNode::terrainMapping(const pcl::PointCloud<Laser>::Ptr &cloud_input,
                                     const Eigen::Vector3f &sensor_origin) {
@@ -339,9 +213,7 @@ void LabelGenerationNode::recordFootprints(const ros::TimerEvent &event) {
   grid_map::Position robot_position(base2map.transform.translation.x,
                                     base2map.transform.translation.y);
   auto &height_map = mapper_->getHeightMap();
-  // [new] Calculate soft label score based on IMU data and pass it to addFootprint
-  float current_score = calculateSoftLabel();
-  label_generator_->addFootprint(height_map, robot_position, current_score);
+  label_generator_->addFootprint(height_map, robot_position);
 }
 
 void LabelGenerationNode::publishLabelMap(const ros::TimerEvent &event) {
@@ -351,9 +223,13 @@ void LabelGenerationNode::publishLabelMap(const ros::TimerEvent &event) {
                                      lesta::layers::Feature::SLOPE,
                                      lesta::layers::Feature::ROUGHNESS,
                                      lesta::layers::Feature::CURVATURE,
-                                     height_mapping::layers::Height::ELEVATION_VARIANCE,
+                                     lesta::layers::Feature::VARIANCE,
                                      lesta::layers::Label::FOOTPRINT,
-                                     lesta::layers::Label::TRAVERSABILITY};
+                                     lesta::layers::Label::TRAVERSABILITY,
+                                     // 新增的可视化层
+                                     lesta::layers::Feature::INTENSITY_MEAN,
+                                     lesta::layers::Feature::INTENSITY_VAR,
+                                     lesta::layers::Feature::SPARSITY};
   sensor_msgs::PointCloud2 cloud_msg;
   const auto &height_map = mapper_->getHeightMap();
   const auto &valid_indices = mapper_->getMeasuredGridIndices();
@@ -481,16 +357,19 @@ bool LabelGenerationNode::saveLabelMap(lesta::save_training_data::Request &req,
     point.roughness = height_map.at(lesta::layers::Feature::ROUGHNESS, index);
     point.curvature = height_map.at(lesta::layers::Feature::CURVATURE, index);
     point.variance =
-        height_map.at(height_mapping::layers::Height::ELEVATION_VARIANCE, index);
+        height_map.at(lesta::layers::Feature::VARIANCE, index);
+    point.intensity_mean = 
+        height_map.isValid(index, lesta::layers::Feature::INTENSITY_MEAN) ? 
+        height_map.at(lesta::layers::Feature::INTENSITY_MEAN, index) : 0.0f;
+    point.intensity_var = 
+        height_map.isValid(index, lesta::layers::Feature::INTENSITY_VAR) ?
+        height_map.at(lesta::layers::Feature::INTENSITY_VAR, index) : 0.0f;
+    point.sparsity = 
+        height_map.isValid(index, lesta::layers::Feature::SPARSITY) ?
+        height_map.at(lesta::layers::Feature::SPARSITY, index) : 0.0f;
     point.footprint = height_map.at(lesta::layers::Label::FOOTPRINT, index);
     point.traversability_label =
         height_map.at(lesta::layers::Label::TRAVERSABILITY, index);
-    // [new] Load visual_cost safely, default to NaN if not present
-    if (height_map.exists(lesta::layers::Visual::COST)) {
-      point.visual_cost = height_map.at(lesta::layers::Visual::COST, index);
-    } else {
-      point.visual_cost = std::nanf("");
-    } 
     label_cloud.push_back(point);
   }
   label_cloud.width = label_cloud.points.size();
@@ -636,43 +515,7 @@ void LabelGenerationNode::toMapRegion(const HeightMap &map,
 
   marker.points[4] = marker.points[0];
 }
-// [新增代码] IMU 回调函数，维护滑动窗口
-void LabelGenerationNode::imuCallback(const sensor_msgs::Imu::ConstPtr& msg) {
-  std::lock_guard<std::mutex> lock(imu_mutex_);
-  imu_buffer_.push_back(msg);
-  
-  while (!imu_buffer_.empty()) {
-    double time_diff = (msg->header.stamp - imu_buffer_.front()->header.stamp).toSec();
-    if (time_diff > imu_window_size_) {
-      imu_buffer_.pop_front();
-    } else {
-      break;
-    }
-  }
-}
-// [新增代码] 计算当前时间窗口内的软标签得分
-float LabelGenerationNode::calculateSoftLabel() {
-  std::lock_guard<std::mutex> lock(imu_mutex_);
-  
-  if (imu_buffer_.empty()) return 1.0f; 
-
-  double sum_z = 0.0;
-  for (const auto& imu : imu_buffer_) {
-    sum_z += imu->linear_acceleration.z;
-  }
-  double mean_z = sum_z / imu_buffer_.size();
-
-  double sq_sum = 0.0;
-  for (const auto& imu : imu_buffer_) {
-    sq_sum += std::pow(imu->linear_acceleration.z - mean_z, 2);
-  }
-  double variance_z = sq_sum / imu_buffer_.size();
-
-  float score = std::exp(-lambda_decay_ * variance_z);
-  return std::max((float)min_soft_label_, score);
-}
-}
-// namespace lesta_ros
+} // namespace lesta_ros
 
 int main(int argc, char **argv) {
 

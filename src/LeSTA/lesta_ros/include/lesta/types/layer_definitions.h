@@ -3,11 +3,19 @@
 namespace lesta {
 namespace layers {
 
+// 在 Feature 结构体中添加新的特征常量
 struct Feature {
   static constexpr const char *STEP = "feature/step";
   static constexpr const char *SLOPE = "feature/slope";
   static constexpr const char *ROUGHNESS = "feature/roughness";
   static constexpr const char *CURVATURE = "feature/curvature";
+  
+  // 新增特征层
+  static constexpr const char *VARIANCE = "feature/variance"; 
+  static constexpr const char *INTENSITY_MEAN = "feature/intensity_mean";
+  static constexpr const char *INTENSITY_VAR = "feature/intensity_var";
+  static constexpr const char *SPARSITY = "feature/sparsity";
+
   static constexpr const char *NORMAL_X = "feature/normal_x";
   static constexpr const char *NORMAL_Y = "feature/normal_y";
   static constexpr const char *NORMAL_Z = "feature/normal_z";
@@ -24,10 +32,6 @@ struct Traversability {
   static constexpr const char *LOG_ODDS = "mapping/log_odds";
   static constexpr const char *LOG_ODDS_PROBABILITY = "mapping/probability";
   static constexpr const char *LOG_ODDS_BINARY = "mapping/binary";
-};
-// [new] Add a new layer definition for visual cost
-struct Visual {
-  static constexpr const char *COST = "visual_cost";
 };
 
 } // namespace layers

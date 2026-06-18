@@ -8,9 +8,6 @@
  */
 
 #include "lesta/core/HeightMapper.h"
-#include <Eigen/Geometry>
-#include <opencv2/opencv.hpp>
-// [new]
 #include "lesta/types/layer_definitions.h"
 
 namespace lesta {
@@ -38,6 +35,12 @@ void HeightMapper::initMap() {
   map_.setFrameId(cfg.frame_id);
   map_.setGeometry(grid_map::Length(cfg.map_length_x, cfg.map_length_y),
                    cfg.grid_resolution);
+  
+  // =========== [新增代码] =============
+  // 初始化强度特征图层，确保HeightMap(GridMap)包含这些通道
+  map_.addLayer(layers::Feature::INTENSITY_MEAN);
+  map_.addLayer(layers::Feature::INTENSITY_VAR);
+  // ===================================
 }
 
 void HeightMapper::initHeightEstimator() {
@@ -88,6 +91,66 @@ typename boost::shared_ptr<pcl::PointCloud<PointT>> HeightMapper::heightMapping(
 
   // 2. Update height map
   height_estimator_->estimate(map_, *cloud_rasterized);
+
+  // ========= [新增代码] =========
+  // 3.计算并写入强度特征(Intensity Mean & Variance)
+  // 使用 if constexpr 在编译期安全检查当前 PointT 是否含有intensity 字段
+  if constexpr (pcl::traits::has_field<PointT, pcl::fields::intensity>::value) {
+      // 成功分支：编译期判定 PointT 包含 intensity
+      static bool print_once_success = false;
+      if (!print_once_success) {
+          std::cout << "\n\033[1;32m[DEBUG-LeSTA] SUCCESS! PointT has 'intensity' field. Intensity feature block is COMPILED and EXECUTING.\033[0m\n" << std::endl;
+          print_once_success = true;
+      }     
+      std::unordered_map<std::pair<int, int>, std::vector<float>, pair_hash> intensity_grid;
+      grid_map::Position measuredPosition;
+      grid_map::Index measuredIndex;
+
+      // 3.1 遍历原始密集点云，将点云强度按照其落入的 Grid 进行归类聚合
+      for (const auto &point : *cloud) {
+          measuredPosition << point.x, point.y;
+          
+          // 若点超出了当前局部地图的范围，则跳过
+          if (!map_.getIndex(measuredPosition, measuredIndex)) {
+              continue; 
+          }
+
+          auto gridIndex = std::make_pair(measuredIndex.x(), measuredIndex.y());
+          intensity_grid[gridIndex].push_back(point.intensity);
+      }
+
+      // 3.2 计算每个 Grid 中的强度均值与方差，并写入到地图中
+      for (const auto &[index_pair, intensities] : intensity_grid) {
+          grid_map::Index gridIndex(index_pair.first, index_pair.second);
+
+          // 计算均值
+          float sum = 0.0f;
+          for (float i : intensities) sum += i;
+          float mean = sum / intensities.size();
+
+          // 计算样本方差
+          float var = 0.0f;
+          if (intensities.size() > 1) {
+              float var_sum = 0.0f;
+              for (float i : intensities) {
+                  var_sum += (i - mean) * (i - mean);
+              }
+              var = var_sum / (intensities.size() - 1); 
+          }
+
+          // 写入 HeightMap (底层通过重载或直接调用封装的 grid_map::GridMap)
+          map_.at(layers::Feature::INTENSITY_MEAN, gridIndex) = mean;
+          map_.at(layers::Feature::INTENSITY_VAR, gridIndex) = var;
+      }
+  } else {
+    // 失败分支：编译期判定 PointT 不包含 intensity，原本的代码会被直接丢弃
+      static bool print_once_fail = false;
+      if (!print_once_fail) {
+          std::cout << "\n\033[1;31m[DEBUG-LeSTA] FATAL WARNING! PointT does NOT have 'intensity' field. Intensity feature block is SKIPPED during compilation!\033[0m\n" << std::endl;
+          print_once_fail = true;
+      }
+  }
+  // ===============================================================
   return cloud_rasterized;
 }
 
@@ -234,83 +297,5 @@ HeightMapper::cloudRasterizationAlt<Color>(const pcl::PointCloud<Color>::Ptr &cl
 template void
 HeightMapper::raycasting<Color>(const Eigen::Vector3f &sensorOrigin,
                                 const typename pcl::PointCloud<Color>::Ptr &cloud);
-// [new]
-// ============================================================================
-void HeightMapper::integrateVisualCost(const pcl::PointCloud<Laser>::Ptr& cloud_map,
-                                       const cv::Mat& visual_cost_img,
-                                       const Eigen::Matrix4f& T_map_to_sensor) {
-  if (cloud_map->empty()) return;
-  // [新增]输出min_cost和max_cost用于debug
-  double min_cost, max_cost;
-  cv::minMaxLoc(visual_cost_img, &min_cost, &max_cost);
-  std::cout << "[Debug] Visual Cost Range -> Min: " << min_cost << ", Max: " << max_cost << std::endl;
-  // ----------------------------------
-  // 1. RELLIS-3D 相机内参保持不变
-  cv::Mat K_intrinsic = cv::Mat::zeros(3,3, CV_64F);
-  K_intrinsic.at<double>(0,0) = 2813.643275; 
-  K_intrinsic.at<double>(1,1) = 2808.326079; 
-  K_intrinsic.at<double>(0,2) = 969.285772;       
-  K_intrinsic.at<double>(1,2) = 624.049972;       
-  K_intrinsic.at<double>(2,2) = 1.0;
 
- // ================= 修改核心点 =================
-// RELLIS-3D 真实的 LiDAR 到 Camera 的 4x4 投影矩阵
-  // 由 T_cam_to_lidar 求逆得出，完美适配其后置 LiDAR 的坐标系
-  Eigen::Matrix4f T_lidar_to_cam;
-  T_lidar_to_cam << 
-      -0.005104, -0.999940,  0.008940,  0.03957,
-      -0.034580,  0.009100,  0.999360,  0.16753,
-      -0.999380,  0.004800, -0.034620, -0.13772,
-       0.000000,  0.000000,  0.000000,  1.00000;
-  if(!map_.exists(lesta::layers::Visual::COST)) {
-    map_.addLayer(lesta::layers::Visual::COST, 0.0f); 
-  }
-
-  // [新增] 用于排查投影状态的调试计数器
-  int total_pts = 0;
-  int front_pts = 0;
-  int valid_project_pts = 0;
-// 3. 遍历当前帧点云
-  for (const auto& pt_map : cloud_map->points) {
-    total_pts++;
-    
-    Eigen::Vector4f p_m(pt_map.x, pt_map.y, pt_map.z, 1.0);
-    Eigen::Vector4f p_sensor = T_map_to_sensor * p_m;
-
-    if (std::abs(p_sensor.x()) < 0.1 && std::abs(p_sensor.y()) < 0.1) continue;
-
-    // 直接相乘，不需要 inverse
-    Eigen::Vector4f p_c = T_lidar_to_cam * p_sensor;
-
-    if (p_c.z() <= 0.0) continue;
-    front_pts++; // 统计在相机正前方的点数
-
-    double u = (K_intrinsic.at<double>(0,0) * p_c.x() + K_intrinsic.at<double>(0,2) * p_c.z()) / p_c.z();
-    double v = (K_intrinsic.at<double>(1,1) * p_c.y() + K_intrinsic.at<double>(1,2) * p_c.z()) / p_c.z();
-
-    int px = std::round(u);
-    int py = std::round(v);
-
-    if (px >= 0 && px < visual_cost_img.cols && py >= 0 && py < visual_cost_img.rows) {
-      valid_project_pts++; // 统计真正落入图像像素内的点数
-      
-      float cost = visual_cost_img.at<float>(py, px);
-      grid_map::Position position(pt_map.x, pt_map.y);
-      grid_map::Index index;
-      
-      if (map_.getIndex(position, index)) {
-        float current_cost = map_.at(lesta::layers::Visual::COST, index);
-        if (cost > current_cost) {
-            map_.at(lesta::layers::Visual::COST, index) = cost;
-        }
-      }
-    }
-  }
-  
-  // 打印最终的投影存活率
-  std::cout << "[Debug] Lidar points - Total: " << total_pts 
-            << " | Front of Cam: " << front_pts 
-            << " | Valid Projected: " << valid_project_pts << std::endl;
-}
-// ============================================================================
 } // namespace lesta

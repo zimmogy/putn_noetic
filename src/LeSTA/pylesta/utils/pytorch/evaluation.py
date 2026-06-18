@@ -6,7 +6,6 @@ File: utils/pytorch/evaluation.py
 
 import torch
 
-
 class ConfusionMatrixTracker:
     def __init__(self, num_classes: int):
         self.num_classes = num_classes
@@ -21,19 +20,50 @@ class ConfusionMatrixTracker:
             if pred_key not in self.confusion_matrices:
                 self.confusion_matrices[pred_key] = torch.zeros(
                     self.num_classes, self.num_classes)
-            self.confusion_matrices[pred_key] += self._update_confMat(
-                preds[pred_key], targets[pred_key])
+            # Ensure tensors are on the same device before adding
+            conf_mat = self._update_confMat(preds[pred_key], targets[pred_key])
+            self.confusion_matrices[pred_key] += conf_mat.to(self.confusion_matrices[pred_key].device)
 
     def _update_confMat(self, preds: torch.Tensor, targets: torch.Tensor):
-        
         # Validity check
         assert preds.shape == targets.shape
-        x_row = preds.view(-1)
-        y_row = targets.view(-1)
+        x_row = preds.view(-1).long()
+        y_row = targets.view(-1).long()
         assert x_row.shape == y_row.shape
         
-        # Mask out invalid targets
+        # Mask out invalid targets (e.g. 忽略标签 -1 的点)
+        valid_mask = (y_row >= 0) & (y_row < self.num_classes)
+        x_row = x_row[valid_mask]
+        y_row = y_row[valid_mask]
         
+        # Calculate confusion matrix using bincount
+        indices = self.num_classes * y_row + x_row
+        m = torch.bincount(indices, minlength=self.num_classes ** 2)
+        return m.reshape(self.num_classes, self.num_classes).float()
+
+    def get_metrics(self, pred_key: str):
+        """基于混淆矩阵计算 Pr, Re, Spe, F1 指标"""
+        if pred_key not in self.confusion_matrices:
+            return None
+            
+        cm = self.confusion_matrices[pred_key]
+        # 混淆矩阵结构: 行是 True Label (0: Non-trav, 1: Trav), 列是 Predicted Label
+        tn = cm[0, 0].item()
+        fp = cm[0, 1].item()
+        fn = cm[1, 0].item()
+        tp = cm[1, 1].item()
+        
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+        f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+        
+        return {
+            "Precision": precision,
+            "Recall": recall,
+            "Specificity": specificity,
+            "F1": f1_score
+        }
 
 class LossTracker:
     def __init__(self):

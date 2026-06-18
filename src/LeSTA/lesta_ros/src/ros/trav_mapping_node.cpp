@@ -57,17 +57,8 @@ void TravMappingNode::loadConfig(const ros::NodeHandle &nh) {
 }
 
 void TravMappingNode::initializePubSubs() {
-  // sub_lidarscan_ =
-  //     nh_.subscribe(cfg_.lidarscan_topic, 1, &TravMappingNode::lidarScanCallback, this);
-  
-  // [new] Add subscriber for visual cost map
-  // ================================
-  sub_lidarscan_sync_.subscribe(nh_, cfg_.lidarscan_topic, 10);
-  sub_visual_cost_sync_.subscribe(nh_, "/visual_cost_map", 10); // subscribe to visual cost map topic
-  sync_ = std::make_unique<message_filters::Synchronizer<SyncPolicy>>(SyncPolicy(10), sub_lidarscan_sync_, sub_visual_cost_sync_);
-  sync_->registerCallback(boost::bind(&TravMappingNode::syncedCallback, this, _1, _2));
-  // =================================
-
+  sub_lidarscan_ =
+      nh_.subscribe(cfg_.lidarscan_topic, 1, &TravMappingNode::lidarScanCallback, this);
   pub_downsampled_scan_ =
       nh_.advertise<sensor_msgs::PointCloud2>("/lesta/mapping/scan_downsampled", 1);
   pub_filtered_scan_ =
@@ -83,70 +74,7 @@ void TravMappingNode::initializePubSubs() {
     // TODO: Add debug publishers
   }
 }
-// [new] achieve new synced callback function for lidar scan and visual cost map
-// =================================
-void TravMappingNode::syncedCallback( const sensor_msgs::PointCloud2ConstPtr& scan_msg, 
-                                      const sensor_msgs::ImageConstPtr& cost_img_msg) {
-                                        // === 请在这里补上这部分初始化代码 ===
-  if (!lidarscan_received_) {
-    lidarscan_received_ = true;
-    frame_id_.sensor = scan_msg->header.frame_id; // 从点云消息中获取 sensor 的 frame_id
-    std::cout << "\033[1;32m[lesta_ros::TravMappingNode]: "
-              << "Synced scans received! Starting vision-geometry traversability mapping... "
-              << "\033[0m\n";
-  }
-  // ==================================
-  // 1. 直接获取 sensor 到 map 的 TF 变换 (绕过 base)
-  geometry_msgs::TransformStamped sensor2map;
-  if (!tf_.lookupTransform(frame_id_.map, frame_id_.sensor, sensor2map)){
-    ROS_WARN("Waiting for TF transforms...");
-    return;
-  }
-  
-  // 2. convert ROS msg to OpenCV Mat
-  cv_bridge::CvImagePtr cv_ptr;
-  try {
-    cv_ptr = cv_bridge::toCvCopy(cost_img_msg, sensor_msgs::image_encodings::TYPE_32FC1);
-  } catch (cv_bridge::Exception& e) {
-    ROS_ERROR("cv_bridge exception: %s", e.what());
-    return;
-  }  
-  cv::Mat visual_cost_map = cv_ptr->image;
 
-  // 3. preprocess the cloudpoint (只传入 sensor2map)
-  auto scan_raw = boost::make_shared<pcl::PointCloud<Laser>>();
-  pcl::fromROSMsg(*scan_msg, *scan_raw);
-  auto scan_preprocessed = preprocessScan(scan_raw, sensor2map);
-  if (!scan_preprocessed) {
-      return;
-  }
-
-  // 4. [core patch]: vision-geometry fusion
-  // 直接计算 Sensor 到 Map 的变换矩阵，并求逆得到 Map 到 Sensor 的变换
-  Eigen::Quaternionf q(sensor2map.transform.rotation.w, sensor2map.transform.rotation.x,
-                       sensor2map.transform.rotation.y, sensor2map.transform.rotation.z);
-  Eigen::Vector3f t(sensor2map.transform.translation.x, sensor2map.transform.translation.y,
-                    sensor2map.transform.translation.z);
-  Eigen::Matrix4f T_sensor2map = Eigen::Matrix4f::Identity();
-  T_sensor2map.block<3,3>(0,0) = q.toRotationMatrix();
-  T_sensor2map.block<3,1>(0,3) = t;
-  
-  Eigen::Matrix4f T_map_to_sensor = T_sensor2map.inverse();
-
-  // 传入 T_map_to_sensor
-  mapper_->integrateVisualCost(scan_preprocessed, visual_cost_map, T_map_to_sensor);
-  
-  // 5. continue original traversability mapping pipeline and feature extraction 
-  // 直接从 sensor2map 中提取传感器原点位置
-  Eigen::Vector3f sensor_origin(sensor2map.transform.translation.x,
-                                sensor2map.transform.translation.y,
-                                sensor2map.transform.translation.z);
-                                
-  auto measured_indices = terrainMapping(scan_preprocessed, sensor_origin);
-  feature_extractor_->extractFeatures(mapper_->getHeightMap(), measured_indices);
-  trav_mapper_->traversabilityMapping(mapper_->getHeightMap(), measured_indices);
-  map_publish_timer_.start(); // start publishing maps
-}
 void TravMappingNode::initializeServices() {
   //
 }
@@ -167,24 +95,26 @@ void TravMappingNode::lidarScanCallback(const sensor_msgs::PointCloud2Ptr &msg) 
               << "\033[0m\n";
   }
 
-  // 1. 直接获取 sensor 到 map 的 TF 变换
-  geometry_msgs::TransformStamped sensor2map;
-  if (!tf_.lookupTransform(frame_id_.map, frame_id_.sensor, sensor2map))
+  // 1. Get transform matrix using tf tree
+  geometry_msgs::TransformStamped sensor2base, base2map;
+  if (!tf_.lookupTransform(frame_id_.robot, frame_id_.sensor, sensor2base) ||
+      !tf_.lookupTransform(frame_id_.map, frame_id_.robot, base2map))
     return;
 
   // 2. Convert ROS msg to PCL data
   auto scan_raw = boost::make_shared<pcl::PointCloud<Laser>>();
   pcl::moveFromROSMsg(*msg, *scan_raw);
 
-  // 3. Preprocess scan data
-  auto scan_preprocessed = preprocessScan(scan_raw, sensor2map);
+  // 3. Preprocess scan data: ready for terrain mapping
+  auto scan_preprocessed = preprocessScan(scan_raw, sensor2base, base2map);
   if (!scan_preprocessed)
     return;
 
   // 4. Terrain mapping
-  Eigen::Vector3f sensor_origin(sensor2map.transform.translation.x,
-                                sensor2map.transform.translation.y,
-                                sensor2map.transform.translation.z);
+  auto transform_sensor2map = TransformOps::multiplyTransforms(sensor2base, base2map);
+  Eigen::Vector3f sensor_origin(transform_sensor2map.transform.translation.x,
+                                transform_sensor2map.transform.translation.y,
+                                transform_sensor2map.transform.translation.z);
   auto measured_indices = terrainMapping(scan_preprocessed, sensor_origin);
 
   // 5. Feature extraction
@@ -198,16 +128,20 @@ void TravMappingNode::lidarScanCallback(const sensor_msgs::PointCloud2Ptr &msg) 
 }
 pcl::PointCloud<Laser>::Ptr
 TravMappingNode::preprocessScan(const pcl::PointCloud<Laser>::Ptr &scan_raw,
-                                const geometry_msgs::TransformStamped &sensor2map) {
-  // 1. 在传感器坐标系下进行降采样，用于可视化
-  auto scan_downsampled = PointCloudOps::downsampleVoxel<Laser>(scan_raw, 0.4);
+                                const geometry_msgs::TransformStamped &sensor2base,
+                                const geometry_msgs::TransformStamped &base2map) {
+  // 1. Transform pointcloud to base frame
+  auto scan_base = PointCloudOps::applyTransform<Laser>(scan_raw, sensor2base);
+
+  // For visualization: downsample pointcloud
+  auto scan_downsampled = PointCloudOps::downsampleVoxel<Laser>(scan_base, 0.4);
   publishDownsampledScan(scan_downsampled);
 
-  // 2. Fast height filtering (直接作用于原始传感器点云)
+  // 2. Fast height filtering
   auto scan_preprocessed = boost::make_shared<pcl::PointCloud<Laser>>();
-  mapper_->fastHeightFilter(scan_raw, scan_preprocessed);
+  mapper_->fastHeightFilter(scan_base, scan_preprocessed);
 
-  // 3. Pass through filter (在传感器坐标系下裁剪指定范围的点)
+  // 3. Pass through filter
   scan_preprocessed = PointCloudOps::passThrough<Laser>(scan_preprocessed,
                                                         "x",
                                                         -cfg_.scan_filter_range,
@@ -225,8 +159,8 @@ TravMappingNode::preprocessScan(const pcl::PointCloud<Laser>::Ptr &scan_raw,
   // 4. Publish filtered scan
   publishFilteredScan(scan_preprocessed);
 
-  // 5. 直接将点云从 sensor 坐标系转换到 map 坐标系
-  scan_preprocessed = PointCloudOps::applyTransform<Laser>(scan_preprocessed, sensor2map);
+  // 5. Transform pointcloud to map frame
+  scan_preprocessed = PointCloudOps::applyTransform<Laser>(scan_preprocessed, base2map);
 
   if (scan_preprocessed->empty())
     return nullptr;
@@ -292,12 +226,16 @@ void TravMappingNode::publishTravMap(const HeightMap &heightmap,
                                      const std::unordered_set<grid_map::Index> &indices) {
 
   std::vector<std::string> layers = {height_mapping::layers::Height::ELEVATION,
-                                     height_mapping::layers::Height::ELEVATION_VARIANCE,
+                                     lesta::layers::Feature::VARIANCE,
                                      lesta::layers::Feature::STEP,
                                      lesta::layers::Feature::SLOPE,
                                      lesta::layers::Feature::ROUGHNESS,
                                      lesta::layers::Feature::CURVATURE,
-                                     lesta::layers::Visual::COST,
+                                     // ================= [新增修复：发布新增的特征层] =================
+                                     lesta::layers::Feature::INTENSITY_MEAN,
+                                     lesta::layers::Feature::INTENSITY_VAR,
+                                     lesta::layers::Feature::SPARSITY,
+                                    // ==============================================================
                                      lesta::layers::Traversability::PROBABILITY,
                                      lesta::layers::Traversability::BINARY,
                                      lesta::layers::Traversability::LOG_ODDS,
