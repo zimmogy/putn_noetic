@@ -1,0 +1,18 @@
+<launch>
+  <arg name="scene" default="map1"/>
+  <arg name="lesta_model_path" default="/home/whr/下载/epoch_best.pt"/>
+  <arg name="lesta_putn_weight" default="0.3"/>
+  <arg name="lesta_weight" default="0.7"/>
+  <arg name="lesta_unknown_penalty" default="0.0"/>
+  <arg name="lesta_risk_threshold" default="0.75"/>
+
+  <include file="$(find putn_launch)/launch/simulation.launch">
+    <arg name="scene" value="$(arg scene)"/>
+    <arg name="use_lesta" value="true"/>
+    <arg name="lesta_model_path" value="$(arg lesta_model_path)"/>
+    <arg name="lesta_putn_weight" value="$(arg lesta_putn_weight)"/>
+    <arg name="lesta_weight" value="$(arg lesta_weight)"/>
+    <arg name="lesta_unknown_penalty" value="$(arg lesta_unknown_penalty)"/>
+    <arg name="lesta_risk_threshold" value="$(arg lesta_risk_threshold)"/>
+  </include>
+</launch>

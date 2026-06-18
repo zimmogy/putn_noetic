@@ -1,5 +1,11 @@
 <launch>
   <arg name="scene" default="map1"/>
+  <arg name="use_lesta" default="false"/>
+  <arg name="lesta_model_path" default="/home/whr/下载/epoch_best.pt"/>
+  <arg name="lesta_putn_weight" default="0.3"/>
+  <arg name="lesta_weight" default="0.7"/>
+  <arg name="lesta_unknown_penalty" default="0.0"/>
+  <arg name="lesta_risk_threshold" default="0.75"/>
 
   <include file="$(find putn_map)/launch/$(arg scene).launch"/>
 
@@ -16,6 +22,22 @@
   <node pkg="tf" type="static_transform_publisher" name="world_to_camera_init" args="0 0 0 0 0 0 /world /camera_init 10" /><!--10ms-->
   <node pkg="tf" type="static_transform_publisher" name="camera_to_link" args="0 0 -0.4 0 0 0 /aft_mapped /base_link 10" />
 
+  <group if="$(arg use_lesta)">
+    <node pkg="lesta" type="trav_prediction_node" name="lesta_trav_prediction" output="screen">
+      <rosparam command="load" subst_value="true" file="$(find lesta)/config/trav_prediction_node.yaml" />
+      <rosparam command="load" subst_value="true" file="$(find lesta)/config/include/feature_extraction_params.yaml" />
+      <param name="node/lidarscan_topic" value="/velodyne_points"/>
+      <param name="frame_id/robot_frame" value="base_link"/>
+      <param name="frame_id/map_frame" value="world"/>
+      <param name="height_mapper/frame_id" value="world"/>
+      <param name="traversability_network/model_path" value="$(arg lesta_model_path)"/>
+    </node>
+
+    <node pkg="grid_map_visualization" type="grid_map_visualization" name="lesta_feature_visualization" output="log">
+      <rosparam command="load" file="$(find lesta)/config/include/feature_visualization.yaml" />
+    </node>
+  </group>
+
   <node pkg="waypoint_generator" name="waypoint_generator" type="waypoint_generator">
       <remap from="~goal" to="/goal"/>
       <param name="waypoint_type" value="manual-lonely-waypoint"/>    
@@ -27,6 +49,11 @@
       <remap from="~lesta_traversability" to="/lesta/prediction/traversability"/>
 
       <rosparam command="load" file="$(find putn)/config/for_simulation/$(arg scene).yaml"/>
+      <param name="planning/use_lesta_traversability" value="$(arg use_lesta)"/>
+      <param name="planning/lesta_putn_weight" value="$(arg lesta_putn_weight)"/>
+      <param name="planning/lesta_weight" value="$(arg lesta_weight)"/>
+      <param name="planning/lesta_unknown_penalty" value="$(arg lesta_unknown_penalty)"/>
+      <param name="planning/lesta_risk_threshold" value="$(arg lesta_risk_threshold)"/>
   </node>
 
   <node pkg="putn" type="local_obs_node" name="local_obs_node" output="screen" required = "true">
