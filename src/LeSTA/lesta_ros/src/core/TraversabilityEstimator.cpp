@@ -9,6 +9,8 @@
 
 #include "lesta/core/TraversabilityEstimator.h"
 
+#include <ros/console.h>
+
 namespace lesta {
 
 TraversabilityEstimator::TraversabilityEstimator(const Config &cfg) : cfg(cfg) {
@@ -134,11 +136,17 @@ void TraversabilityEstimator::estimateTraversabilityImpl(
 
   // Perform batch inference if we have valid cells
   if (!features.empty()) {
-    std::cout << "\n\033[1;36m[DEBUG] Valid cells: " << features.size() << " | Sample Feature [0]: " << features[0].transpose() << "\033[0m" << std::endl;
+    ROS_DEBUG_STREAM_THROTTLE(1.0,
+                              "[lesta::TraversabilityEstimator] Valid cells: "
+                                  << features.size() << " | Sample Feature [0]: "
+                                  << features[0].transpose());
 
     std::vector<float> predictions = network_.inference(features);
 
-    std::cout << "\033[1;35m[DEBUG] Sample Logit [0]: " << predictions[0] << " | Sigmoid Probability: " << sigmoid(predictions[0]) << "\033[0m\n" << std::endl;
+    ROS_DEBUG_STREAM_THROTTLE(1.0,
+                              "[lesta::TraversabilityEstimator] Sample Logit [0]: "
+                                  << predictions[0] << " | Sigmoid Probability: "
+                                  << sigmoid(predictions[0]));
 
     // Update map with predictions
     for (size_t i = 0; i < valid_indices.size(); ++i) {

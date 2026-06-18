@@ -197,6 +197,8 @@ protected:
 
     float calPathDis(const std::vector<Node*> &nodes);
 
+    bool isTraversabilityAcceptable(const Node* node) const;
+
     void pubTraversabilityOfTree(ros::Publisher* tree_tra_pub);
 };
 }

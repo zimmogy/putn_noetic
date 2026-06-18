@@ -4,6 +4,8 @@
 #include <visualization_msgs/Marker.h>
 #include <nav_msgs/Path.h>
 #include <std_msgs/Float32MultiArray.h>
+#include <grid_map_ros/GridMapRosConverter.hpp>
+#include <grid_map_msgs/GridMap.h>
 
 using namespace std;
 using namespace std_msgs;
@@ -18,7 +20,7 @@ backward::SignalHandling sh;
 }
 
 // ros related
-ros::Subscriber map_sub, wp_sub;
+ros::Subscriber map_sub, wp_sub, lesta_traversability_sub;
 
 ros::Publisher grid_map_vis_pub;
 ros::Publisher path_vis_pub;
@@ -39,6 +41,7 @@ double h_surf_car;
 double max_initial_time;
 double radius_fit_plane;
 FitPlaneArg fit_plane_arg;
+LeSTATraversabilityArg lesta_traversability_arg;
 double neighbor_radius;
 
 // useful global variables
@@ -50,6 +53,7 @@ PFRRTStar* pf_rrt_star = NULL;
 // function declaration
 void rcvWaypointsCallback(const nav_msgs::Path& wp);
 void rcvPointCloudCallBack(const sensor_msgs::PointCloud2& pointcloud_map);
+void rcvLeSTATraversabilityCallBack(const grid_map_msgs::GridMap& msg);
 void pubInterpolatedPath(const vector<Node*>& solution, ros::Publisher* _path_interpolation_pub);
 void findSolution();
 void callPlanner();
@@ -82,6 +86,19 @@ void rcvPointCloudCallBack(const sensor_msgs::PointCloud2& pointcloud_map)
     world->setObs(obstacle);
   }
   visWorld(world, &grid_map_vis_pub);
+}
+
+/**
+ *@brief receive LeSTA traversability grid map for risk-aware planning.
+ */
+void rcvLeSTATraversabilityCallBack(const grid_map_msgs::GridMap& msg)
+{
+  if (!lesta_traversability_arg.enabled || world == NULL)
+    return;
+
+  grid_map::GridMap map;
+  grid_map::GridMapRosConverter::fromMessage(msg, map);
+  world->updateLeSTATraversabilityMap(map);
 }
 
 /**
@@ -235,6 +252,8 @@ int main(int argc, char** argv)
 
   map_sub = nh.subscribe("map", 1, rcvPointCloudCallBack);
   wp_sub = nh.subscribe("waypoints", 1, rcvWaypointsCallback);
+  lesta_traversability_sub =
+      nh.subscribe("lesta_traversability", 1, rcvLeSTATraversabilityCallBack);
 
   grid_map_vis_pub = nh.advertise<sensor_msgs::PointCloud2>("grid_map_vis", 1);
   path_vis_pub = nh.advertise<visualization_msgs::Marker>("path_vis", 20);
@@ -261,10 +280,23 @@ int main(int argc, char** argv)
 
   nh.param("planning/radius_fit_plane", radius_fit_plane, 1.0);
 
+  nh.param("planning/use_lesta_traversability", lesta_traversability_arg.enabled, false);
+  nh.param("planning/lesta_putn_weight", lesta_traversability_arg.putn_weight, 0.3f);
+  nh.param("planning/lesta_weight", lesta_traversability_arg.lesta_weight, 0.7f);
+  nh.param("planning/lesta_unknown_penalty", lesta_traversability_arg.unknown_penalty, 0.0f);
+  nh.param("planning/lesta_risk_threshold", lesta_traversability_arg.risk_threshold, 0.75f);
+  nh.param("planning/lesta_probability_layer",
+           lesta_traversability_arg.probability_layer,
+           std::string("traversability/probability"));
+  nh.param("planning/lesta_binary_layer",
+           lesta_traversability_arg.binary_layer,
+           std::string("traversability/binary"));
+
   nh.param("planning/max_initial_time", max_initial_time, 1000.0);
 
   // Initialization
   world = new World(resolution);
+  world->setLeSTATraversabilityArg(lesta_traversability_arg);
   pf_rrt_star = new PFRRTStar(h_surf_car, world);
 
   // Set argument of PF-RRT*

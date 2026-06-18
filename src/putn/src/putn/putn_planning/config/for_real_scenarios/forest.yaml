@@ -20,5 +20,11 @@ planning:
   conv_thre: 0.1152
 
   max_initial_time: 3000.0
-
+  use_lesta_traversability: false
+  lesta_putn_weight: 0.3
+  lesta_weight: 0.7
+  lesta_unknown_penalty: 0.0
+  lesta_risk_threshold: 0.75
+  lesta_probability_layer: "traversability/probability"
+  lesta_binary_layer: "traversability/binary"
 

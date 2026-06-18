@@ -430,6 +430,14 @@ Node* PFRRTStar::fitPlane(const Vector2d &p_original)
     return node;
 }
 
+bool PFRRTStar::isTraversabilityAcceptable(const Node* node) const
+{
+    if(node==NULL || node->plane_==NULL) return false;
+    if(!world_->useLeSTATraversability()) return true;
+    if(node->plane_->has_lesta_probability && !node->plane_->lesta_traversable) return false;
+    return node->plane_->traversability <= world_->getLeSTATraversabilityArg().risk_threshold;
+}
+
 void PFRRTStar::fitPlane(Node* node)
 {
     Vector2d init_coord=node->plane_->init_coord;
@@ -655,6 +663,7 @@ Path PFRRTStar::planner(const int &max_iter,const double &max_time)
 
         if( new_node!=NULL//1.Fail to fit the plane,it will return a null pointer
             &&world_->isInsideBorder(new_node->position_)//2.The position is out of the range of the grid map.
+            &&isTraversabilityAcceptable(new_node)//3.The fused traversability risk is acceptable.
           ) 
         {
             //Get the set of the neighbors of the new node in the tree

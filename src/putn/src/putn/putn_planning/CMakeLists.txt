@@ -3,6 +3,9 @@ project(putn)
 
 find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
+  grid_map_core
+  grid_map_msgs
+  grid_map_ros
   nav_msgs
   roscpp
   rviz_visual_tools
@@ -45,7 +48,5 @@ target_link_libraries(local_obs_node
     ${catkin_LIBRARIES}
     ${PCL_LIBRARIES} 
 )
-
-
 
 

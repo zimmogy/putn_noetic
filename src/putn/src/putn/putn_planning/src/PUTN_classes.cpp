@@ -33,9 +33,16 @@ Node::~Node()
 Path::Path():cost_(INF),type_(Empty){}
 Path::~Path(){}
 
-Plane::Plane(){}
+Plane::Plane():traversability(0.0f),
+               geometric_traversability(0.0f),
+               lesta_probability(0.5f),
+               has_lesta_probability(false),
+               lesta_traversable(true){}
 Plane::Plane(const Eigen::Vector3d &p_surface,World* world,const double &radius,const FitPlaneArg &arg)
 {
+    lesta_probability=0.5f;
+    has_lesta_probability=false;
+    lesta_traversable=true;
     init_coord=project2plane(p_surface);
     Vector3d ball_center = world->coordRounding(p_surface);
     float resolution = world->getResolution();
@@ -120,8 +127,29 @@ Plane::Plane(const Eigen::Vector3d &p_surface,World* world,const double &radius,
     }
 
     //The traversability is linear combination of the three indicators
-    traversability=arg.w_total_*(arg.w_flatness_*flatness+arg.w_slope_*slope+arg.w_sparsity_*sparsity);
-    traversability = (1 < traversability)?1:traversability; 
+    geometric_traversability=arg.w_total_*(arg.w_flatness_*flatness+arg.w_slope_*slope+arg.w_sparsity_*sparsity);
+    geometric_traversability = (1 < geometric_traversability)?1:geometric_traversability;
+    traversability=geometric_traversability;
+
+    float probability;
+    bool traversable;
+    if(world->queryLeSTATraversability(init_coord,&probability,&traversable))
+    {
+        const LeSTATraversabilityArg lesta_arg=world->getLeSTATraversabilityArg();
+        lesta_probability=probability;
+        has_lesta_probability=true;
+        lesta_traversable=traversable;
+        const float lesta_risk=1.0f-probability;
+        traversability=lesta_arg.putn_weight*geometric_traversability+
+                       lesta_arg.lesta_weight*lesta_risk;
+        if(traversability<0.0f) traversability=0.0f;
+        if(traversability>1.0f) traversability=1.0f;
+    }
+    else if(world->getLeSTATraversabilityArg().enabled)
+    {
+        traversability=geometric_traversability+world->getLeSTATraversabilityArg().unknown_penalty;
+        if(traversability>1.0f) traversability=1.0f;
+    }
 }
 
 
@@ -244,6 +272,54 @@ bool World::collisionFree(const Node* node_start,const Node* node_end)
     return isfree;
 }
 
+void World::updateLeSTATraversabilityMap(const grid_map::GridMap &map)
+{
+    lesta_traversability_map_=map;
+    has_lesta_traversability_map_=
+        map.exists(lesta_traversability_arg_.probability_layer) ||
+        map.exists(lesta_traversability_arg_.binary_layer);
+}
+
+bool World::queryLeSTATraversability(const Vector2d &position,float* probability,bool* traversable) const
+{
+    if(!useLeSTATraversability()) return false;
+
+    const grid_map::Position grid_position(position(0),position(1));
+    grid_map::Index index;
+    if(!lesta_traversability_map_.getIndex(grid_position,index)) return false;
+
+    bool has_probability=false;
+    if(probability!=NULL && lesta_traversability_map_.exists(lesta_traversability_arg_.probability_layer) &&
+       !lesta_traversability_map_.isEmptyAt(lesta_traversability_arg_.probability_layer,index))
+    {
+        *probability=lesta_traversability_map_.at(lesta_traversability_arg_.probability_layer,index);
+        if(*probability<0.0f) *probability=0.0f;
+        if(*probability>1.0f) *probability=1.0f;
+        has_probability=true;
+    }
+
+    bool has_binary=false;
+    if(traversable!=NULL && lesta_traversability_map_.exists(lesta_traversability_arg_.binary_layer) &&
+       !lesta_traversability_map_.isEmptyAt(lesta_traversability_arg_.binary_layer,index))
+    {
+        *traversable=lesta_traversability_map_.at(lesta_traversability_arg_.binary_layer,index)>0.5f;
+        has_binary=true;
+    }
+    else if(traversable!=NULL && has_probability)
+    {
+        *traversable=*probability>0.5f;
+        has_binary=true;
+    }
+
+    if(probability!=NULL && !has_probability && has_binary)
+    {
+        *probability=*traversable?1.0f:0.0f;
+        has_probability=true;
+    }
+
+    return has_probability || has_binary;
+}
+
 void World::setObs(const Vector3d &point)
 {   
     Vector3i idx=coord2index(point);
@@ -291,4 +367,3 @@ bool World::isInsideBorder(const Vector3i &index)
            index(2) < idx_count_(2);
 }
 }
-

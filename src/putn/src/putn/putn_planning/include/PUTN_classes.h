@@ -7,9 +7,11 @@
 #define PUTN_CLASSES_H
 
 #include <vector>
+#include <string>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
+#include <grid_map_core/GridMap.hpp>
 
 namespace PUTN
 {
@@ -85,9 +87,24 @@ public:
     std::vector<Eigen::Vector3d> plane_pts;
     Eigen::Vector3d normal_vector;
     float traversability;
+    float geometric_traversability;
+    float lesta_probability;
+    bool has_lesta_probability;
+    bool lesta_traversable;
 
     Plane();
     Plane(const Eigen::Vector3d &p_surface,World* world,const double &radius,const FitPlaneArg &arg);
+};
+
+struct LeSTATraversabilityArg
+{
+    bool enabled=false;
+    float putn_weight=0.3f;
+    float lesta_weight=0.7f;
+    float unknown_penalty=0.0f;
+    float risk_threshold=0.75f;
+    std::string probability_layer="traversability/probability";
+    std::string binary_layer="traversability/binary";
 };
 
 namespace visualization{void visWorld(World* world,ros::Publisher* world_vis_pub);}
@@ -102,6 +119,7 @@ public:
 
     //indicate whether the range of the grid map has been determined
     bool has_map_=false;
+    bool has_lesta_traversability_map_=false;
 
     World(const float &resolution=0.1f);
     ~World();
@@ -152,6 +170,12 @@ public:
      * @return bool true(no obstacle exists),false(exist obstacle)
      */
     bool collisionFree(const Node* node_start,const Node* node_end);
+
+    void setLeSTATraversabilityArg(const LeSTATraversabilityArg &arg){lesta_traversability_arg_=arg;}
+    LeSTATraversabilityArg getLeSTATraversabilityArg() const {return lesta_traversability_arg_;}
+    bool useLeSTATraversability() const {return lesta_traversability_arg_.enabled && has_lesta_traversability_map_;}
+    void updateLeSTATraversabilityMap(const grid_map::GridMap &map);
+    bool queryLeSTATraversability(const Eigen::Vector2d &position,float* probability,bool* traversable) const;
     
     /**
      * @brief Check whether the given point is within the range of the grid map
@@ -195,6 +219,8 @@ public:
     }
 //protected:
     bool ***grid_map_=NULL;
+    grid_map::GridMap lesta_traversability_map_;
+    LeSTATraversabilityArg lesta_traversability_arg_;
 
     float resolution_;
 
