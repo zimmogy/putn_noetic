@@ -37,6 +37,11 @@ Path::~Path(){}
 
 Plane::Plane():traversability(0.0f),
                geometric_traversability(0.0f),
+               geometric_traversability_raw(0.0f),
+               putn_flatness(0.0f),
+               putn_slope(0.0f),
+               putn_sparsity(0.0f),
+               putn_vacancy_ratio(0.0f),
                lesta_probability(0.5f),
                has_lesta_probability(false),
                lesta_traversable(true){}
@@ -45,6 +50,7 @@ Plane::Plane(const Eigen::Vector3d &p_surface,World* world,const double &radius,
     lesta_probability=0.5f;
     has_lesta_probability=false;
     lesta_traversable=true;
+    putn_vacancy_ratio=0.0f;
     init_coord=project2plane(p_surface);
     Vector3d ball_center = world->coordRounding(p_surface);
     float resolution = world->getResolution();
@@ -88,12 +94,14 @@ Plane::Plane(const Eigen::Vector3d &p_surface,World* world,const double &radius,
     float flatness = 0;
     for(size_t i = 0; i < pt_num; i++) flatness+=powf(normal_vector.dot(A.row(i)),4);
     flatness /= (1+pt_num);
+    putn_flatness=flatness;
 
     //calculate indicator2:slope
     Vector3d z_axies(0,0,1);
     float cos_slope=fabs(z_axies.dot(normal_vector));
     if(cos_slope>1.0f) cos_slope=1.0f;
     float slope = 180.0f*(float)acos(cos_slope) / PI;
+    putn_slope=slope;
 
     //calculate indicator3:sparsity
     float sparsity = 0.0f;
@@ -122,6 +130,7 @@ Plane::Plane(const Eigen::Vector3d &p_surface,World* world,const double &radius,
         MatrixXd covMat = (zeroMeanMat.adjoint()*zeroMeanMat)/float(M_vac.rows());
         float trace  = (covMat.transpose()*covMat(0,0)).trace();
         float ratio = vac_cout/(float)(vac.rows()*vac.cols());
+        putn_vacancy_ratio=ratio;
  
         if(ratio > arg.ratio_max_) sparsity = 1;
         else if(ratio > arg.ratio_min_ && ratio < arg.ratio_max_ && (1/trace) > arg.conv_thre_) 
@@ -129,10 +138,11 @@ Plane::Plane(const Eigen::Vector3d &p_surface,World* world,const double &radius,
             sparsity=(ratio-arg.ratio_min_)/(arg.ratio_max_-arg.ratio_min_);
         else sparsity = 0;
     }
+    putn_sparsity=sparsity;
 
     //The traversability is linear combination of the three indicators
-    geometric_traversability=arg.w_total_*(arg.w_flatness_*flatness+arg.w_slope_*slope+arg.w_sparsity_*sparsity);
-    geometric_traversability = (1 < geometric_traversability)?1:geometric_traversability;
+    geometric_traversability_raw=arg.w_total_*(arg.w_flatness_*flatness+arg.w_slope_*slope+arg.w_sparsity_*sparsity);
+    geometric_traversability = (1 < geometric_traversability_raw)?1:geometric_traversability_raw;
     traversability=geometric_traversability;
 
     float probability;

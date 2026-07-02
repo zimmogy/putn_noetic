@@ -738,12 +738,17 @@ void PFRRTStar::pubFusedTraversabilityCloud(Publisher* fused_traversability_clou
     msg.is_dense=false;
 
     sensor_msgs::PointCloud2Modifier modifier(msg);
-    modifier.setPointCloud2Fields(9,
+    modifier.setPointCloud2Fields(14,
                                   "x",1,sensor_msgs::PointField::FLOAT32,
                                   "y",1,sensor_msgs::PointField::FLOAT32,
                                   "z",1,sensor_msgs::PointField::FLOAT32,
                                   "fused_risk",1,sensor_msgs::PointField::FLOAT32,
                                   "putn_risk",1,sensor_msgs::PointField::FLOAT32,
+                                  "putn_raw_risk",1,sensor_msgs::PointField::FLOAT32,
+                                  "putn_flatness",1,sensor_msgs::PointField::FLOAT32,
+                                  "putn_slope",1,sensor_msgs::PointField::FLOAT32,
+                                  "putn_sparsity",1,sensor_msgs::PointField::FLOAT32,
+                                  "putn_vacancy_ratio",1,sensor_msgs::PointField::FLOAT32,
                                   "lesta_probability",1,sensor_msgs::PointField::FLOAT32,
                                   "lesta_risk",1,sensor_msgs::PointField::FLOAT32,
                                   "lesta_observed",1,sensor_msgs::PointField::FLOAT32,
@@ -755,6 +760,11 @@ void PFRRTStar::pubFusedTraversabilityCloud(Publisher* fused_traversability_clou
     sensor_msgs::PointCloud2Iterator<float> iter_z(msg,"z");
     sensor_msgs::PointCloud2Iterator<float> iter_fused_risk(msg,"fused_risk");
     sensor_msgs::PointCloud2Iterator<float> iter_putn_risk(msg,"putn_risk");
+    sensor_msgs::PointCloud2Iterator<float> iter_putn_raw_risk(msg,"putn_raw_risk");
+    sensor_msgs::PointCloud2Iterator<float> iter_putn_flatness(msg,"putn_flatness");
+    sensor_msgs::PointCloud2Iterator<float> iter_putn_slope(msg,"putn_slope");
+    sensor_msgs::PointCloud2Iterator<float> iter_putn_sparsity(msg,"putn_sparsity");
+    sensor_msgs::PointCloud2Iterator<float> iter_putn_vacancy_ratio(msg,"putn_vacancy_ratio");
     sensor_msgs::PointCloud2Iterator<float> iter_lesta_probability(msg,"lesta_probability");
     sensor_msgs::PointCloud2Iterator<float> iter_lesta_risk(msg,"lesta_risk");
     sensor_msgs::PointCloud2Iterator<float> iter_lesta_observed(msg,"lesta_observed");
@@ -769,6 +779,11 @@ void PFRRTStar::pubFusedTraversabilityCloud(Publisher* fused_traversability_clou
         *iter_z=static_cast<float>(node->position_(2));
         *iter_fused_risk=node->plane_->traversability;
         *iter_putn_risk=node->plane_->geometric_traversability;
+        *iter_putn_raw_risk=node->plane_->geometric_traversability_raw;
+        *iter_putn_flatness=node->plane_->putn_flatness;
+        *iter_putn_slope=node->plane_->putn_slope;
+        *iter_putn_sparsity=node->plane_->putn_sparsity;
+        *iter_putn_vacancy_ratio=node->plane_->putn_vacancy_ratio;
         *iter_lesta_probability=node->plane_->lesta_probability;
         *iter_lesta_risk=1.0f-node->plane_->lesta_probability;
         *iter_lesta_observed=node->plane_->has_lesta_probability?1.0f:0.0f;
@@ -779,6 +794,11 @@ void PFRRTStar::pubFusedTraversabilityCloud(Publisher* fused_traversability_clou
         ++iter_z;
         ++iter_fused_risk;
         ++iter_putn_risk;
+        ++iter_putn_raw_risk;
+        ++iter_putn_flatness;
+        ++iter_putn_slope;
+        ++iter_putn_sparsity;
+        ++iter_putn_vacancy_ratio;
         ++iter_lesta_probability;
         ++iter_lesta_risk;
         ++iter_lesta_observed;

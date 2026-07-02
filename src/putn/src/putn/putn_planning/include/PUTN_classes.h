@@ -88,6 +88,11 @@ public:
     Eigen::Vector3d normal_vector;
     float traversability;
     float geometric_traversability;
+    float geometric_traversability_raw;
+    float putn_flatness;
+    float putn_slope;
+    float putn_sparsity;
+    float putn_vacancy_ratio;
     float lesta_probability;
     bool has_lesta_probability;
     bool lesta_traversable;
