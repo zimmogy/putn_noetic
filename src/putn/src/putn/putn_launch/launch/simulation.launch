@@ -7,6 +7,7 @@
   <arg name="lesta_unknown_penalty" default="0.0"/>
   <arg name="lesta_risk_threshold" default="0.75"/>
   <arg name="scout_urdf_extras" default="$(find scout_description)/urdf/scout_v2_rgb_camera.xacro"/>
+  <arg name="launch_local_control" default="true"/>
 
   <include file="$(find putn_map)/launch/$(arg scene).launch"/>
 
@@ -76,7 +77,9 @@
 
   <node name="rviz" pkg="rviz" type="rviz" args="-d $(find putn_launch)/rviz_config/simulation.rviz" required="true"/>
 
-  <node name="local_planner" pkg="local_planner" type="local_planner.py" launch-prefix="gnome-terminal --title=local_planner --"/>
-  <node name="controller" pkg="local_planner" type="controller.py" launch-prefix="gnome-terminal --title=controller --"/>
+  <group if="$(arg launch_local_control)">
+    <node name="local_planner" pkg="local_planner" type="local_planner.py" launch-prefix="gnome-terminal --title=local_planner --"/>
+    <node name="controller" pkg="local_planner" type="controller.py" launch-prefix="gnome-terminal --title=controller --"/>
+  </group>
 
 </launch>

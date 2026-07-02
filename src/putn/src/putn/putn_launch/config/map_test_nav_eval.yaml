@@ -1,0 +1,154 @@
+evaluation:
+  name: map_test_nav_success_rate
+  scene: map_test
+  runs_per_task: 3
+  total_episodes: 30
+  fixed_frame: world
+  robot_frame: base_link
+  goal_topic: /goal
+
+  success_criteria:
+    goal_tolerance_m: 0.5
+    timeout_s: 120.0
+    stuck_speed_threshold_mps: 0.03
+    stuck_duration_s: 8.0
+    pit_margin_m: 0.35
+    column_margin_m: 0.35
+    roll_pitch_fail_deg: 35.0
+
+  output_fields:
+    - episode_id
+    - task_id
+    - run_id
+    - method
+    - success
+    - failure_reason
+    - time_to_goal
+    - path_length
+    - planned_path_length
+    - min_distance_to_pit
+    - min_distance_to_column
+    - mean_fused_risk
+    - max_fused_risk
+    - replan_count
+
+map:
+  bounds:
+    x_min: -8.0
+    x_max: 8.0
+    y_min: -8.0
+    y_max: 8.0
+  safe_start_goal_margin_m: 1.0
+
+  pits:
+    - id: pit_a
+      center: [-4.6, 2.8]
+      size: [1.6, 1.6]
+      depth_m: 0.9
+    - id: pit_b
+      center: [1.8, -3.2]
+      size: [1.8, 1.6]
+      depth_m: 0.9
+    - id: pit_c
+      center: [4.7, 2.8]
+      size: [1.6, 1.6]
+      depth_m: 0.9
+
+  columns:
+    - id: column_01
+      center: [-5.6, -1.2]
+      radius_m: 0.32
+    - id: column_02
+      center: [-5.2, 5.4]
+      radius_m: 0.38
+    - id: column_03
+      center: [-3.2, -5.1]
+      radius_m: 0.44
+    - id: column_04
+      center: [-1.3, 4.4]
+      radius_m: 0.34
+    - id: column_05
+      center: [-0.8, -1.1]
+      radius_m: 0.30
+    - id: column_06
+      center: [1.2, 5.4]
+      radius_m: 0.42
+    - id: column_07
+      center: [3.6, -5.5]
+      radius_m: 0.36
+    - id: column_08
+      center: [4.8, -0.6]
+      radius_m: 0.46
+    - id: column_09
+      center: [5.6, 1.0]
+      radius_m: 0.32
+    - id: column_10
+      center: [5.5, -3.8]
+      radius_m: 0.40
+    - id: column_11
+      center: [-2.0, 6.0]
+      radius_m: 0.34
+    - id: column_12
+      center: [2.9, 1.0]
+      radius_m: 0.30
+
+tasks:
+  - id: task_01
+    category: cross_map
+    start: [-6.7, -6.6, 0.0]
+    goal: [6.6, 6.5, 0.0]
+    note: long diagonal route crossing the full obstacle field
+
+  - id: task_02
+    category: cross_map
+    start: [-6.6, 6.6, 0.0]
+    goal: [6.7, -6.5, 0.0]
+    note: opposite diagonal route with different pit exposure
+
+  - id: task_03
+    category: pit_avoid
+    start: [-6.8, 0.4, 0.0]
+    goal: [6.8, 0.4, 0.0]
+    note: horizontal route between pit row and central columns
+
+  - id: task_04
+    category: pit_avoid
+    start: [-6.7, 3.9, 0.0]
+    goal: [6.6, 3.9, 0.0]
+    note: route near north pit openings, should avoid pit_a and pit_c
+
+  - id: task_05
+    category: pit_avoid
+    start: [-6.4, -4.4, 0.0]
+    goal: [6.4, -4.4, 0.0]
+    note: route south of pit_b and near lower column cluster
+
+  - id: task_06
+    category: column_avoid
+    start: [-6.6, -2.3, 0.0]
+    goal: [6.5, -2.3, 0.0]
+    note: lateral route through central and eastern column obstacles
+
+  - id: task_07
+    category: column_avoid
+    start: [-3.6, -6.7, 0.0]
+    goal: [-3.6, 6.7, 0.0]
+    note: vertical route on west side, near column_03 and pit_a
+
+  - id: task_08
+    category: column_avoid
+    start: [3.2, -6.7, 0.0]
+    goal: [3.2, 6.7, 0.0]
+    note: vertical route on east side, near pit_b, pit_c, and columns
+
+  - id: task_09
+    category: mixed
+    start: [-6.7, -5.6, 0.0]
+    goal: [6.4, 0.1, 0.0]
+    note: mixed route near pit_b and eastern column group
+
+  - id: task_10
+    category: mixed
+    start: [6.6, -6.4, 0.0]
+    goal: [-6.4, 4.8, 0.0]
+    note: mixed long route near all three pits and dense columns
