@@ -9,6 +9,8 @@
   <arg name="global_path_topic" default="/global_planning_node/global_path"/>
   <arg name="fused_cloud_topic" default="/global_planning_node/fused_traversability_cloud"/>
   <arg name="reset_settle_s" default="3.0"/>
+  <arg name="pre_goal_warmup_s" default="25.0"/>
+  <arg name="hold_goal_clear_s" default="3.0"/>
   <arg name="path_grace_s" default="20.0"/>
   <arg name="risk_sample_radius_m" default="0.75"/>
   <arg name="enable_cmd_follower" default="true"/>
@@ -26,6 +28,8 @@
     <param name="global_path_topic" value="$(arg global_path_topic)"/>
     <param name="fused_cloud_topic" value="$(arg fused_cloud_topic)"/>
     <param name="reset_settle_s" value="$(arg reset_settle_s)"/>
+    <param name="pre_goal_warmup_s" value="$(arg pre_goal_warmup_s)"/>
+    <param name="hold_goal_clear_s" value="$(arg hold_goal_clear_s)"/>
     <param name="path_grace_s" value="$(arg path_grace_s)"/>
     <param name="risk_sample_radius_m" value="$(arg risk_sample_radius_m)"/>
     <param name="enable_cmd_follower" value="$(arg enable_cmd_follower)"/>

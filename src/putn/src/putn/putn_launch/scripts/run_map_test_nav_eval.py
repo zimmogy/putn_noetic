@@ -55,6 +55,8 @@ class MapTestNavEval:
         )
         self.reset_settle_s = rospy.get_param("~reset_settle_s", 3.0)
         self.goal_publish_count = rospy.get_param("~goal_publish_count", 5)
+        self.pre_goal_warmup_s = rospy.get_param("~pre_goal_warmup_s", 25.0)
+        self.hold_goal_clear_s = rospy.get_param("~hold_goal_clear_s", 3.0)
         self.path_grace_s = rospy.get_param("~path_grace_s", 20.0)
         self.risk_sample_radius_m = rospy.get_param("~risk_sample_radius_m", 0.75)
         self.enable_cmd_follower = rospy.get_param("~enable_cmd_follower", True)
@@ -193,6 +195,25 @@ class MapTestNavEval:
             self.goal_pub.publish(msg)
             rospy.sleep(0.2)
 
+    def warm_up_planner(self, start):
+        if self.pre_goal_warmup_s <= 0.0:
+            return
+
+        rospy.loginfo(
+            "Warming up PUTN planner for %.1f seconds before sending the evaluation goal",
+            self.pre_goal_warmup_s,
+        )
+        self.publish_goal(start)
+        rospy.sleep(self.hold_goal_clear_s)
+        self.cmd_pub.publish(Twist())
+
+        deadline = time.time() + self.pre_goal_warmup_s
+        rate = rospy.Rate(10)
+        while not rospy.is_shutdown() and time.time() < deadline:
+            self.cmd_pub.publish(Twist())
+            rate.sleep()
+        self.reset_episode_state()
+
     def distances_to_hazards(self, point):
         min_pit = min(rect_distance(point, pit["center"], pit["size"]) for pit in self.pits)
         min_column = min(
@@ -244,6 +265,7 @@ class MapTestNavEval:
     def run_episode(self, episode_id, task, run_id):
         self.reset_episode_state()
         self.set_robot_pose(task["start"])
+        self.warm_up_planner(task["start"])
         self.publish_goal(task["goal"])
 
         start_wall = time.time()
