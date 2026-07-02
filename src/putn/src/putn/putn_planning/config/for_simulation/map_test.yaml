@@ -1,9 +1,9 @@
 map:
   resolution: 0.1
-  map_x_l: -20.0
-  map_x_u: 20.0
-  map_y_l: -20.0
-  map_y_u: 20.0
+  map_x_l: -8.0
+  map_x_u: 8.0
+  map_y_l: -8.0
+  map_y_u: 8.0
 
 planning:
   step_size: 0.4
