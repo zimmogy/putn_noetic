@@ -14,8 +14,8 @@ planning:
   w_slope: 0.02
   w_sparsity: 0.2
 
-  ratio_max: 0.05
-  ratio_min: 0.02
+  ratio_max: 0.85
+  ratio_min: 0.40
   conv_thre: 0.1152
 
   radius_fit_plane: 1.0
