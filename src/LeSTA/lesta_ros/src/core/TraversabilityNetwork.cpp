@@ -9,12 +9,20 @@
 
 #include "lesta/core/TraversabilityNetwork.h"
 #include <torch/torch.h>
+#include <fstream>
 #include <iostream>
 
 namespace lesta {
 
 bool TraversabilityNetwork::loadCheckpoint(const std::string &model_path) {
   try {
+    std::ifstream model_file(model_path);
+    if(!model_file.good()) {
+      std::cerr << "\033[1;31m[lesta::TraversabilityNetwork]: Model file is not readable: "
+                << model_path << "\033[0m" << std::endl;
+      return false;
+    }
+
     // Load the TorchScript model
     torch::Device device = torch::kCPU;
     // torch::Device device = torch::cuda::is_available() ? torch::kCUDA : torch::kCPU;
@@ -36,8 +44,8 @@ bool TraversabilityNetwork::loadCheckpoint(const std::string &model_path) {
               << model_name << "\033[0m" << std::endl;
     return true;
   } catch (const c10::Error &e) {
-    // std::cerr << "\033[1;31m[lesta::TraversabilityNetwork]: Error loading the model: "
-    // << e.what() << "\033[0m" << std::endl;
+    std::cerr << "\033[1;31m[lesta::TraversabilityNetwork]: Error loading the model: "
+              << e.what() << "\033[0m" << std::endl;
     return false;
   }
 }

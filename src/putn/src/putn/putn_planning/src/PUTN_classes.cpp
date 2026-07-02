@@ -7,6 +7,8 @@
 
 #include "PUTN_classes.h"
 
+#include <cmath>
+
 using namespace std;
 using namespace Eigen;
 
@@ -89,7 +91,9 @@ Plane::Plane(const Eigen::Vector3d &p_surface,World* world,const double &radius,
 
     //calculate indicator2:slope
     Vector3d z_axies(0,0,1);
-    float slope = 180.0f*(float)acos(z_axies.dot(normal_vector)) / PI;
+    float cos_slope=fabs(z_axies.dot(normal_vector));
+    if(cos_slope>1.0f) cos_slope=1.0f;
+    float slope = 180.0f*(float)acos(cos_slope) / PI;
 
     //calculate indicator3:sparsity
     float sparsity = 0.0f;

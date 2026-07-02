@@ -11,7 +11,7 @@ planning:
 
   w_fit_plane: 1.0
   w_flatness: 1000.0
-  w_slope: 0.03
+  w_slope: 0.02
   w_sparsity: 1.5
 
   ratio_max: 0.05
@@ -28,5 +28,4 @@ planning:
   lesta_binary_layer: "traversability/binary"
   
  
-
 
