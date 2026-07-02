@@ -6,6 +6,7 @@
     <arg name="yaw" default="0.0"/>
 
     <arg name="robot_namespace" default="/"/>
+    <arg name="urdf_extras" default="$(find scout_description)/urdf/empty.urdf"/>
 
     <!-- these are the arguments you can pass this launch file, for example paused:=true -->
     <arg name="paused" default="true" />
@@ -16,6 +17,7 @@
 
     <include file="$(find scout_description)/launch/scout_v2_stock.launch">
         <arg name="robot_namespace" value="$(arg robot_namespace)" />
+        <arg name="urdf_extras" value="$(arg urdf_extras)" />
     </include>
 
     <node name="spawn_scout_model" pkg="gazebo_ros" type="spawn_model" args="-x $(arg x)

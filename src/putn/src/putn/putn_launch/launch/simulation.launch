@@ -6,6 +6,7 @@
   <arg name="lesta_weight" default="0.7"/>
   <arg name="lesta_unknown_penalty" default="0.0"/>
   <arg name="lesta_risk_threshold" default="0.75"/>
+  <arg name="scout_urdf_extras" default="$(find scout_description)/urdf/scout_v2_rgb_camera.xacro"/>
 
   <include file="$(find putn_map)/launch/$(arg scene).launch"/>
 
@@ -13,6 +14,7 @@
     <arg name="x" value="0"/>
     <arg name="y" value="0"/>
     <arg name="z" value="1"/>
+    <arg name="urdf_extras" value="$(arg scout_urdf_extras)"/>
   </include>
 
   <include file="$(find aloam_velodyne)/launch/aloam_velodyne_HDL_32.launch">
