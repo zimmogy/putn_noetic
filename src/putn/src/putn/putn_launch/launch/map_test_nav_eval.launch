@@ -8,6 +8,9 @@
   <arg name="model_states_topic" default="/gazebo/model_states"/>
   <arg name="global_path_topic" default="/global_planning_node/global_path"/>
   <arg name="fused_cloud_topic" default="/global_planning_node/fused_traversability_cloud"/>
+  <arg name="start_mode" default="navigate"/>
+  <arg name="reposition_timeout_s" default="180.0"/>
+  <arg name="start_tolerance_m" default="0.6"/>
   <arg name="reset_settle_s" default="3.0"/>
   <arg name="pre_goal_warmup_s" default="25.0"/>
   <arg name="hold_goal_clear_s" default="3.0"/>
@@ -16,6 +19,7 @@
   <arg name="enable_cmd_follower" default="true"/>
   <arg name="max_linear_speed" default="0.45"/>
   <arg name="max_angular_speed" default="0.8"/>
+  <arg name="initial_delay_s" default="0.0"/>
 
   <node pkg="putn_launch" type="run_map_test_nav_eval.py" name="map_test_nav_eval" output="screen">
     <param name="config_path" value="$(arg config_path)"/>
@@ -27,6 +31,9 @@
     <param name="model_states_topic" value="$(arg model_states_topic)"/>
     <param name="global_path_topic" value="$(arg global_path_topic)"/>
     <param name="fused_cloud_topic" value="$(arg fused_cloud_topic)"/>
+    <param name="start_mode" value="$(arg start_mode)"/>
+    <param name="reposition_timeout_s" value="$(arg reposition_timeout_s)"/>
+    <param name="start_tolerance_m" value="$(arg start_tolerance_m)"/>
     <param name="reset_settle_s" value="$(arg reset_settle_s)"/>
     <param name="pre_goal_warmup_s" value="$(arg pre_goal_warmup_s)"/>
     <param name="hold_goal_clear_s" value="$(arg hold_goal_clear_s)"/>
@@ -35,5 +42,6 @@
     <param name="enable_cmd_follower" value="$(arg enable_cmd_follower)"/>
     <param name="max_linear_speed" value="$(arg max_linear_speed)"/>
     <param name="max_angular_speed" value="$(arg max_angular_speed)"/>
+    <param name="initial_delay_s" value="$(arg initial_delay_s)"/>
   </node>
 </launch>

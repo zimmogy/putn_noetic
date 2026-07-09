@@ -1,0 +1,36 @@
+<launch>
+  <arg name="scene" default="map_test"/>
+  <arg name="lesta_model_path" default="/home/whr/下载/epoch_best.pt"/>
+  <arg name="lesta_putn_weight" default="0.3"/>
+  <arg name="lesta_weight" default="0.7"/>
+  <arg name="lesta_unknown_penalty" default="0.0"/>
+  <arg name="lesta_risk_threshold" default="0.75"/>
+
+  <arg name="config_path" default="$(find putn_launch)/config/map_test_nav_eval.yaml"/>
+  <arg name="output_dir" default="$(env HOME)/.ros/putn_nav_eval"/>
+  <arg name="method" default="lesta_putn"/>
+  <arg name="initial_delay_s" default="45.0"/>
+  <arg name="start_mode" default="navigate"/>
+  <arg name="reposition_timeout_s" default="180.0"/>
+  <arg name="pre_goal_warmup_s" default="25.0"/>
+
+  <include file="$(find putn_launch)/launch/fusion_simulation.launch">
+    <arg name="scene" value="$(arg scene)"/>
+    <arg name="lesta_model_path" value="$(arg lesta_model_path)"/>
+    <arg name="lesta_putn_weight" value="$(arg lesta_putn_weight)"/>
+    <arg name="lesta_weight" value="$(arg lesta_weight)"/>
+    <arg name="lesta_unknown_penalty" value="$(arg lesta_unknown_penalty)"/>
+    <arg name="lesta_risk_threshold" value="$(arg lesta_risk_threshold)"/>
+    <arg name="launch_local_control" value="false"/>
+  </include>
+
+  <include file="$(find putn_launch)/launch/map_test_nav_eval.launch">
+    <arg name="config_path" value="$(arg config_path)"/>
+    <arg name="output_dir" value="$(arg output_dir)"/>
+    <arg name="method" value="$(arg method)"/>
+    <arg name="initial_delay_s" value="$(arg initial_delay_s)"/>
+    <arg name="start_mode" value="$(arg start_mode)"/>
+    <arg name="reposition_timeout_s" value="$(arg reposition_timeout_s)"/>
+    <arg name="pre_goal_warmup_s" value="$(arg pre_goal_warmup_s)"/>
+  </include>
+</launch>

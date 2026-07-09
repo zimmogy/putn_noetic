@@ -53,6 +53,9 @@ class MapTestNavEval:
         self.fused_cloud_topic = rospy.get_param(
             "~fused_cloud_topic", "/global_planning_node/fused_traversability_cloud"
         )
+        self.start_mode = rospy.get_param("~start_mode", "navigate")
+        self.reposition_timeout_s = rospy.get_param("~reposition_timeout_s", 180.0)
+        self.start_tolerance_m = rospy.get_param("~start_tolerance_m", 0.6)
         self.reset_settle_s = rospy.get_param("~reset_settle_s", 3.0)
         self.goal_publish_count = rospy.get_param("~goal_publish_count", 5)
         self.pre_goal_warmup_s = rospy.get_param("~pre_goal_warmup_s", 25.0)
@@ -65,6 +68,7 @@ class MapTestNavEval:
         self.max_angular_speed = rospy.get_param("~max_angular_speed", 0.8)
         self.heading_gain = rospy.get_param("~heading_gain", 1.4)
         self.goal_slowdown_radius_m = rospy.get_param("~goal_slowdown_radius_m", 1.5)
+        self.initial_delay_s = rospy.get_param("~initial_delay_s", 0.0)
 
         with open(self.config_path, "r") as f:
             self.config = yaml.safe_load(f)
@@ -89,8 +93,14 @@ class MapTestNavEval:
         rospy.Subscriber(self.global_path_topic, Float32MultiArray, self.global_path_cb, queue_size=10)
         rospy.Subscriber(self.fused_cloud_topic, rospy.AnyMsg, self.fused_cloud_any_cb, queue_size=1)
 
-        rospy.wait_for_service("/gazebo/set_model_state")
-        self.set_model_state = rospy.ServiceProxy("/gazebo/set_model_state", SetModelState)
+        self.set_model_state = None
+        if self.start_mode == "gazebo":
+            rospy.logwarn(
+                "start_mode:=gazebo teleports the model and can desynchronize A-LOAM. "
+                "Use start_mode:=navigate for evaluation."
+            )
+            rospy.wait_for_service("/gazebo/set_model_state")
+            self.set_model_state = rospy.ServiceProxy("/gazebo/set_model_state", SetModelState)
 
     @staticmethod
     def default_config_path():
@@ -149,7 +159,10 @@ class MapTestNavEval:
         self.latest_cloud = []
         self.current_speed = 0.0
 
-    def set_robot_pose(self, start):
+    def reset_robot_pose_gazebo(self, start):
+        if self.set_model_state is None:
+            raise RuntimeError("Gazebo reset requested while set_model_state is not initialized")
+
         state = ModelState()
         state.model_name = self.robot_model_name
         state.reference_frame = "world"
@@ -178,6 +191,15 @@ class MapTestNavEval:
             self.cmd_pub.publish(stop)
             rospy.sleep(0.05)
         rospy.sleep(self.reset_settle_s)
+
+    def wait_for_pose(self, timeout_s=10.0):
+        deadline = time.time() + timeout_s
+        rate = rospy.Rate(10)
+        while not rospy.is_shutdown() and time.time() < deadline:
+            if self.pose is not None:
+                return True
+            rate.sleep()
+        return False
 
     def publish_goal(self, goal):
         msg = PoseStamped()
@@ -213,6 +235,62 @@ class MapTestNavEval:
             self.cmd_pub.publish(Twist())
             rate.sleep()
         self.reset_episode_state()
+
+    def navigate_to_start(self, start):
+        if not self.wait_for_pose():
+            rospy.logwarn("No robot pose received before repositioning to start")
+            return False
+
+        rospy.loginfo(
+            "Navigating to episode start [%.2f, %.2f] without Gazebo teleport",
+            start[0],
+            start[1],
+        )
+        self.reset_episode_state()
+        self.publish_goal(start)
+
+        deadline = time.time() + self.reposition_timeout_s
+        rate = rospy.Rate(10)
+        while not rospy.is_shutdown() and time.time() < deadline:
+            if self.pose is None:
+                rate.sleep()
+                continue
+
+            pos = (self.pose.position.x, self.pose.position.y)
+            if dist2d(pos, start) <= self.start_tolerance_m:
+                self.cmd_pub.publish(Twist())
+                rospy.sleep(self.reset_settle_s)
+                self.reset_episode_state()
+                return True
+
+            _, _, yaw = quaternion_to_rpy(self.pose.orientation)
+            self.publish_path_follow_cmd(pos, yaw, start)
+            rate.sleep()
+
+        self.cmd_pub.publish(Twist())
+        rospy.logwarn("Timed out while navigating to episode start")
+        return False
+
+    def prepare_episode_start(self, start):
+        if self.start_mode == "navigate":
+            return self.navigate_to_start(start)
+        if self.start_mode == "gazebo":
+            self.reset_episode_state()
+            self.reset_robot_pose_gazebo(start)
+            return True
+        if self.start_mode == "none":
+            if not self.wait_for_pose():
+                return False
+            pos = (self.pose.position.x, self.pose.position.y)
+            if dist2d(pos, start) <= self.start_tolerance_m:
+                self.reset_episode_state()
+                return True
+            rospy.logwarn(
+                "Robot is %.2f m from requested start. Move it near the start or use start_mode:=navigate.",
+                dist2d(pos, start),
+            )
+            return False
+        raise ValueError("Unsupported start_mode: {}".format(self.start_mode))
 
     def distances_to_hazards(self, point):
         min_pit = min(rect_distance(point, pit["center"], pit["size"]) for pit in self.pits)
@@ -263,8 +341,23 @@ class MapTestNavEval:
         self.cmd_pub.publish(cmd)
 
     def run_episode(self, episode_id, task, run_id):
-        self.reset_episode_state()
-        self.set_robot_pose(task["start"])
+        if not self.prepare_episode_start(task["start"]):
+            return {
+                "episode_id": episode_id,
+                "task_id": task["id"],
+                "run_id": run_id,
+                "method": self.method,
+                "success": 0,
+                "failure_reason": "timeout",
+                "time_to_goal": "0.000",
+                "path_length": "0.000",
+                "planned_path_length": "0.000",
+                "min_distance_to_pit": "",
+                "min_distance_to_column": "",
+                "mean_fused_risk": "",
+                "max_fused_risk": "",
+                "replan_count": 0,
+            }
         self.warm_up_planner(task["start"])
         self.publish_goal(task["goal"])
 
@@ -345,6 +438,10 @@ class MapTestNavEval:
         }
 
     def run(self):
+        if self.initial_delay_s > 0.0:
+            rospy.loginfo("Waiting %.1f seconds before starting navigation evaluation", self.initial_delay_s)
+            rospy.sleep(self.initial_delay_s)
+
         os.makedirs(self.output_dir, exist_ok=True)
         stamp = time.strftime("%Y%m%d_%H%M%S")
         out_path = os.path.join(self.output_dir, "{}_{}.csv".format(self.eval_cfg["name"], stamp))
