@@ -1,9 +1,14 @@
+"""
+Modified by: Haoran Wang
+Revision date: 2026-08-12
+"""
+
 import argparse
 import torch
 from utils.param import yaml
 from utils.pytorch import machine
 from lesta.api.model import TraversabilityNetwork
-from utils.pytorch.evaluation import ConfusionMatrixTracker  # [新增] 引入评估模块
+from utils.pytorch.evaluation import ConfusionMatrixTracker
 
 def main(args):
     CFG_PATH = args.config
@@ -57,17 +62,15 @@ def main(args):
         [0.05, 0.8, 0.05, 0.01]                                 # Sample 5: traversable (Assumed)
     ]
     
-    # [新增] 为样本提供对应的真实标签 Ground Truth (1: Traversable, 0: Non-traversable)
     manual_targets = [1, 0, 1, 0, 1] 
 
     # Convert to tensor and move to device
     features = torch.tensor(manual_samples, dtype=torch.float32).to(device)
-    targets = torch.tensor(manual_targets, dtype=torch.float32).to(device) # [新增]
+    targets = torch.tensor(manual_targets, dtype=torch.float32).to(device)
     num_samples = features.shape[0]
     
     print(f'Using {num_samples} manually defined samples with {input_dim} features')
 
-    # [新增] 初始化评估器 (类别为 2: 0 和 1)
     evaluator = ConfusionMatrixTracker(num_classes=2)
 
     # Perform inference
@@ -80,7 +83,6 @@ def main(args):
             probabilities = probabilities.unsqueeze(0)
         predictions = (probabilities >= 0.5).int()
 
-    # [新增] 将预测结果与真实结果送入评估器
     evaluator.add_batch({'trav_pred': predictions}, {'trav_pred': targets})
 
     # Display results
@@ -93,7 +95,6 @@ def main(args):
         gt_label = 'Traversable' if manual_targets[i] == 1 else 'Non-traversable'
         print(f"  Prediction: {pred_label} (Ground Truth: {gt_label})")
 
-    # [新增] 打印评估指标 (完美对齐论文表格格式)
     metrics = evaluator.get_metrics('trav_pred')
     print("\n" + "="*55)
     print(f"{'Method':<20} | {'Pr. [%]':<8} | {'Re. [%]':<8} | {'Spe. [%]':<8} | {'F1':<6}")

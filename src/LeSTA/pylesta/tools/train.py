@@ -1,3 +1,8 @@
+"""
+Modified by: Haoran Wang
+Revision date: 2026-08-12
+"""
+
 import argparse
 
 import torch
@@ -53,12 +58,10 @@ def main(args):
     print('=> Initializing trainer...')
     print('=> Using device:', device)
     criterion = LossFactory(cfg=LOSS_CFG)
-    # ======== [新增：激活正样本偏袒权重] ========
     if LOSS_CFG['type'] in ['bce_loss', 'uncertainty_aware_loss', 'instance_weighted_loss']:
         pos_weight = train_dataset.get_pos_weight()
         criterion.set_pos_weight(pos_weight.to(device))
         print(f'=> Applied Positive Weight (pos_weight): {pos_weight.item():.4f}')
-    # ==========================================
     optim = TrainingOptimizer(model=net, cfg=OPTIMIZER_CFG)
 
     # Create and run trainer
@@ -70,7 +73,7 @@ def main(args):
         scheduler=optim.scheduler,
         device=device,
         cfg=TRAINER_CFG,
-        loss_type=LOSS_CFG['type'] # [新增] 把loss_type 传给trainer进行逻辑判断
+        loss_type=LOSS_CFG['type']
     )
 
     print('=> Start training:')

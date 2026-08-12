@@ -1,7 +1,7 @@
 <div align="center">
     <!-- Title -->
     <h1>LeSTA</h1>
-    <h3>Learning Self-supervised Traversability with Navigation Experiences of Mobile Robots</h3>
+    <h3>Improved LeSTA for Self-supervised Traversability Learning</h3>
     <a href="https://github.com/Ikhyeon-Cho/LeSTA"><img src="https://img.shields.io/badge/C++-LibTorch-EE4C2C?logo=cplusplus" /></a>
     <a href="https://github.com/Ikhyeon-Cho/LeSTA"><img src="https://img.shields.io/badge/ROS1-Noetic-22314E?logo=ros" /></a>
     <a href="https://github.com/Ikhyeon-Cho/LeSTA"><img src="https://img.shields.io/badge/PyTorch-555555?logo=pytorch" /></a>
@@ -23,7 +23,7 @@
         <img src="assets/Traversability Prediction.gif" alt="demo" width="400" height="250"/>
     </p>
 
-**LeSTA directly learns robot-specific traversability in a self-supervised manner** by using a short period of manual driving experience.
+**This repository contains an improved implementation of LeSTA for robot-specific traversability learning.** It keeps the original LeSTA height-map and self-supervised learning pipeline, and extends the feature representation and training loss used in the paper experiments.
 </div>
 
 [paperlink]:https://ieeexplore.ieee.org/document/10468651
@@ -33,17 +33,33 @@
 
 ## :loudspeaker: News & Updates
 
+- **2026.08.12**: This fork documents the improved LeSTA implementation used in our paper experiments. The main changes are listed in [Improved implementation notes](#improved-implementation-notes).
 - **2024.07.30**: Our paper is accepted for presentation at **IEEE ICRA@40** in Rotterdam, Netherlands
 - **2024.02.29**: Our paper is accepted by **IEEE Robotics and Automation Letters** ([IEEE RA-L](https://ieeexplore.ieee.org/document/10468651))
 - **2024.02.19**: We release the [urban-traversability-dataset](https://github.com/Ikhyeon-Cho/urban-traversability-dataset) for learning terrain traversability in urban environments
+
+## Improved implementation notes
+
+This codebase is not identical to the original public LeSTA release. The improved implementation used in our paper experiments includes the following changes:
+
+- **Extended traversability features**: besides the original `step`, `slope`, `roughness`, and `curvature`, this version supports `variance`, `intensity_mean`, `intensity_var`, and `sparsity`.
+- **Configurable feature fields**: `lesta_ros/config/*_node.yaml` and `pylesta/configs/lesta.yaml` must use the same feature order and the same input dimension.
+- **Uncertainty-aware training loss**: `pylesta` includes `uncertainty_aware_loss`, which uses `variance`, `intensity_var`, and `sparsity` to reduce the penalty of uncertain negative samples.
+- **Label smoothing and entropy regularization**: the improved loss applies smoothed labels and an entropy regularization term for more stable pseudo-label training.
+- **Robot self-filtering**: `trav_prediction_node` supports `self_filter_radius` to remove points close to the robot body before height mapping.
+- **TorchScript deployment**: `lesta_ros` loads a TorchScript model with LibTorch. A plain PyTorch `state_dict` checkpoint must be exported to TorchScript before ROS inference.
+
+Author of the improved implementation used in this paper: **Haoran Wang**.
 
 
 ## :rocket: What's in this repo
 - **C++ package for LeSTA** with ROS interface ([lesta_ros](https://github.com/Ikhyeon-Cho/LeSTA/tree/master/lesta_ros/))
   - Traversability label generation from LiDAR-reconstructed height map
   - Traversability inference/mapping using a learned network
+  - Extended feature layers: `variance`, `intensity_mean`, `intensity_var`, and `sparsity`
 
 - **PyTorch scripts** for training LeSTA model ([pylesta](https://github.com/Ikhyeon-Cho/LeSTA/tree/master/lesta_training/))
+  - Uncertainty-aware loss, label smoothing, entropy regularization, and TorchScript export for LibTorch deployment
 
 
 ## :hammer_and_wrench: Installation
@@ -187,11 +203,44 @@ rosservice call /lesta/save_label_map "training_set" ""  # {filename} {directory
 ### 2. Model Training
 #### Launch training script with parameters
 > **Note:** See `pylesta/configs/lesta.yaml` for more training details.
+
+For the improved model used by `lesta_ros`, make sure the feature list and model input dimension are consistent. For an 8-dimensional model, use:
+
+```yaml
+DATASET:
+  feature_fields:
+    - step
+    - slope
+    - roughness
+    - curvature
+    - variance
+    - intensity_mean
+    - intensity_var
+    - sparsity
+
+MODEL:
+  input_dim: 8
+
+LOSS:
+  type: "uncertainty_aware_loss"
+```
+
+If you train with fewer features, update `lesta_ros/config/trav_prediction_node.yaml` and `lesta_ros/config/trav_mapping_node.yaml` accordingly. The ROS inference node requires:
+
+```yaml
+traversability_network:
+  input_dimension: <number_of_feature_fields>
+  feature_fields:
+    - <same_feature_order_as_training>
+```
+
 ```bash
 # Make sure your virtual environment is activated
 cd LeSTA
 python pylesta/tools/train.py --dataset "training_set.pcd"
 ```
+
+When deploying the trained model in `lesta_ros`, use the TorchScript checkpoint generated by the training script when `save_for_libtorch: true` is enabled. Do not pass a plain PyTorch `state_dict` checkpoint directly to `torch::jit::load`.
 
 <br>
 
@@ -202,6 +251,33 @@ Configure `model_path` variable in `lesta_ros/config/*_node.yaml` with your mode
 - **trav_prediction_node.yaml**
 - **trav_mapping_node.yaml**
 > **Note:** See [#model-zoo](#sample-datasets) for our pre-trained checkpoints.
+
+For this improved implementation, the default ROS inference configuration expects the following 8 feature fields:
+
+```yaml
+traversability_network:
+  input_dimension: 8
+  feature_fields:
+    - step
+    - slope
+    - roughness
+    - curvature
+    - variance
+    - intensity_mean
+    - intensity_var
+    - sparsity
+```
+
+The `input_dimension` must match the number of `feature_fields` and the model architecture used during training.
+
+The prediction node also supports robot-body point filtering:
+
+```yaml
+node:
+  self_filter_radius: 0.6
+```
+
+Increase this value if LiDAR returns from the robot body contaminate the height map; decrease it if nearby terrain is being removed.
 
 #### Launch ROS node
 We provide two options for traversability estimation:
@@ -263,6 +339,8 @@ rosbag play {your-rosbag}.bag --clock -r 2
 > See [urban-traversability-dataset](https://github.com/Ikhyeon-Cho/urban-traversability-dataset) repository for more data samples.
 
 ## Model Zoo
+
+The public upstream checkpoints below follow the original LeSTA feature configuration. For this improved implementation, train and export a checkpoint with the same `feature_fields` and `input_dimension` that are configured in `lesta_ros/config/*_node.yaml`.
 
 <table>
   <tr>
@@ -326,7 +404,7 @@ To be updated...
   - We are working on improving the height mapping accuracy.
 
 
-## 📝 Citation
+## 📝 Citation and authorship
 
 Thank you for citing [our paper](https://ieeexplore.ieee.org/document/10468651) if this helps your research project:
 
@@ -344,6 +422,14 @@ Thank you for citing [our paper](https://ieeexplore.ieee.org/document/10468651) 
   doi={10.1109/LRA.2024.3376148}
 }
 ```
+
+The improved implementation in this repository was developed for our paper experiments by:
+
+```text
+Haoran Wang
+```
+
+If you use this improved implementation, please cite the corresponding paper described in your manuscript in addition to the original LeSTA paper when appropriate.
 
 You can also check [the paper](https://ieeexplore.ieee.org/document/9561394) of our baseline:
 
@@ -366,5 +452,8 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ## Contact
 
-For any questions or feedback, feel free to contact us! or publish an issue on [GitHub](https://github.com/Ikhyeon-Cho/LeSTA/issues).
-- [Ikhyeon Cho](https://github.com/Ikhyeon-Cho) :   tre0430`at`korea.ac.kr
+For questions about the original LeSTA project, please refer to the upstream repository:
+- [Ikhyeon Cho](https://github.com/Ikhyeon-Cho) : tre0430`at`korea.ac.kr
+
+For questions about the improved implementation used in our paper experiments, please refer to the paper contact information. The code author is:
+- Haoran Wang

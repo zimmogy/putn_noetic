@@ -1,10 +1,8 @@
 /*
  * trav_prediction_node.h
  *
- *  Created on: Aug 17, 2023
- *      Author: Ikhyeon Cho
- *	 Institute: Korea Univ. ISR (Intelligent Systems & Robotics) Lab
- *       Email: tre0430@korea.ac.kr
+ *  Modified by: Haoran Wang
+ *  Revision date: 2026-08-12
  */
 
 #include <ros/ros.h>
@@ -24,7 +22,7 @@ public:
     double map_pub_rate;
     bool remove_backpoints;
     bool debug_mode;
-    double self_filter_radius; // 新增本体过滤半径
+    double self_filter_radius;
   } cfg_;
 
   TravPredictionNode();

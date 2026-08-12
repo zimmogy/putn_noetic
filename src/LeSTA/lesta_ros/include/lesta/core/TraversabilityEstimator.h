@@ -1,10 +1,8 @@
 /*
  * TraversabilityEstimator.h
  *
- *  Created on: Mar 09, 2025
- *      Author: Ikhyeon Cho
- *	 Institute: Korea Univ. ISR (Intelligent Systems & Robotics) Lab
- *       Email: tre0430@korea.ac.kr
+ *  Modified by: Haoran Wang
+ *  Revision date: 2026-08-12
  */
 
 #pragma once
@@ -58,8 +56,6 @@ private:
       {"roughness", layers::Feature::ROUGHNESS},
       {"curvature", layers::Feature::CURVATURE},
       {"variance", layers::Feature::VARIANCE},
-
-      // [新增特征映射]：将 YAML 中的字符串字段映射到 grid_map 的具体 Layer 名称
       {"intensity_mean", layers::Feature::INTENSITY_MEAN},
       {"intensity_var", layers::Feature::INTENSITY_VAR},
       {"sparsity", layers::Feature::SPARSITY},

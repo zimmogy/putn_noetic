@@ -1,3 +1,8 @@
+"""
+Modified by: Haoran Wang
+Revision date: 2026-08-12
+"""
+
 from lesta.api.model import TraversabilityNetwork
 from utils.param import yaml
 from lesta.api.dataset import TraversabilityDataset

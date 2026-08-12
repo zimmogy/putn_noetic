@@ -1,10 +1,8 @@
 /*
  * trav_mapping_node.cpp
  *
- *  Created on: Aug 17, 2023
- *      Author: Ikhyeon Cho
- *	 Institute: Korea Univ. ISR (Intelligent Systems & Robotics) Lab
- *       Email: tre0430@korea.ac.kr
+ *  Modified by: Haoran Wang
+ *  Revision date: 2026-08-12
  */
 
 #include "lesta/ros/trav_mapping_node.h"
@@ -71,7 +69,6 @@ void TravMappingNode::initializePubSubs() {
       nh_.advertise<visualization_msgs::Marker>("/lesta/mapping/mapping_region", 1);
 
   if (cfg_.debug_mode) {
-    // TODO: Add debug publishers
   }
 }
 
@@ -231,11 +228,9 @@ void TravMappingNode::publishTravMap(const HeightMap &heightmap,
                                      lesta::layers::Feature::SLOPE,
                                      lesta::layers::Feature::ROUGHNESS,
                                      lesta::layers::Feature::CURVATURE,
-                                     // ================= [新增修复：发布新增的特征层] =================
                                      lesta::layers::Feature::INTENSITY_MEAN,
                                      lesta::layers::Feature::INTENSITY_VAR,
                                      lesta::layers::Feature::SPARSITY,
-                                    // ==============================================================
                                      lesta::layers::Traversability::PROBABILITY,
                                      lesta::layers::Traversability::BINARY,
                                      lesta::layers::Traversability::LOG_ODDS,

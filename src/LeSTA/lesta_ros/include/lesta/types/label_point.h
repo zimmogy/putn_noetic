@@ -1,10 +1,8 @@
 /*
  * label_point.h
  *
- *  Created on: Feb 10, 2025
- *      Author: Ikhyeon Cho
- *	 Institute: Korea Univ. ISR (Intelligent Systems & Robotics) Lab
- *       Email: tre0430@korea.ac.kr
+ *  Modified by: Haoran Wang
+ *  Revision date: 2026-08-12
  */
 
 #pragma once
@@ -21,7 +19,6 @@ struct EIGEN_ALIGN16 LabelPoint {
   float roughness;
   float curvature;
   
-  // 新增特征
   float intensity_mean;
   float intensity_var;
   float sparsity;

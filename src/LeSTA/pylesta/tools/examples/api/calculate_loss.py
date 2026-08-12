@@ -1,3 +1,8 @@
+"""
+Modified by: Haoran Wang
+Revision date: 2026-08-12
+"""
+
 import torch
 from lesta.api.loss import LossFactory
 from utils.param import yaml

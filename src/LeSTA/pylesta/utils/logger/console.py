@@ -1,9 +1,8 @@
 """
-Author: Ikhyeon Cho
-Link: https://github.com/Ikhyeon-Cho
-File: logger/console.py
-Date: 2024/11/12 22:50
+Modified by: Haoran Wang
+Revision date: 2026-08-12
 """
+
 
 import logging
 import os

@@ -47,7 +47,6 @@ static lesta::FeatureExtractor::Config loadConfig(const ros::NodeHandle &nh) {
 
   lesta::FeatureExtractor::Config cfg;
   nh.param<double>("pca_radius", cfg.pca_radius, 0.2);
-  // 新增：从参数服务器读取 grid_re, 默认值为 0.1
   nh.param<double>("grid_res", cfg.grid_res, 0.1);
 
   return cfg;

@@ -1,6 +1,6 @@
 """
-Author: Ikhyeon Cho
-Link: https://github.com/Ikhyeon-Cho/LeSTA
+Modified by: Haoran Wang
+Revision date: 2026-08-12
 File: lesta/api/logger.py
 """
 

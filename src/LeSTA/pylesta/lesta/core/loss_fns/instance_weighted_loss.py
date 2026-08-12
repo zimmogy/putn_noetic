@@ -1,3 +1,8 @@
+"""
+Modified by: Haoran Wang
+Revision date: 2026-08-12
+"""
+
 from torch.nn import Module, BCEWithLogitsLoss
 from .entropy_regularization import EntropyRegularization
 

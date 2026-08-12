@@ -3,14 +3,12 @@
 namespace lesta {
 namespace layers {
 
-// 在 Feature 结构体中添加新的特征常量
 struct Feature {
   static constexpr const char *STEP = "feature/step";
   static constexpr const char *SLOPE = "feature/slope";
   static constexpr const char *ROUGHNESS = "feature/roughness";
   static constexpr const char *CURVATURE = "feature/curvature";
   
-  // 新增特征层
   static constexpr const char *VARIANCE = "feature/variance"; 
   static constexpr const char *INTENSITY_MEAN = "feature/intensity_mean";
   static constexpr const char *INTENSITY_VAR = "feature/intensity_var";

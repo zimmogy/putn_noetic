@@ -1,9 +1,8 @@
 """
-Author: Ikhyeon Cho
-Link: https://github.com/Ikhyeon-Cho
-File: logger/tboard.py
-Date: 2024/11/2 18:50
+Modified by: Haoran Wang
+Revision date: 2026-08-12
 """
+
 
 from torch.utils.tensorboard import SummaryWriter
 import torch

@@ -1,3 +1,8 @@
+"""
+Modified by: Haoran Wang
+Revision date: 2026-08-12
+"""
+
 # setup.py
 
 from setuptools import setup, find_namespace_packages
@@ -5,9 +10,9 @@ from setuptools import setup, find_namespace_packages
 setup(
     name="pylesta",
     version="0.2.0",
-    author="Ikhyeon Cho",
-    author_email="tre0430@korea.ac.kr",
-    url="https://github.com/Ikhyeon-Cho/LeSTA",
+    author="Haoran Wang",
+    author_email="haoranwang@todo.todo",
+    url="",
     packages=find_namespace_packages(),
     install_requires=[],  # requirements.txt
     description="Training a risk-aware self-supervised traversability model with navigation experiences of mobile robots",

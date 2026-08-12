@@ -1,6 +1,6 @@
 """
-Author: Ikhyeon Cho
-Link: https://github.com/Ikhyeon-Cho
+Modified by: Haoran Wang
+Revision date: 2026-08-12
 File: utils/sys/time.py
 """
 

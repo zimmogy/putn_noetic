@@ -1,10 +1,8 @@
 /*
  * TraversabilityEstimator.cpp
  *
- *  Created on: Mar 09, 2025
- *      Author: Ikhyeon Cho
- *	 Institute: Korea Univ. ISR (Intelligent Systems & Robotics) Lab
- *       Email: tre0430@korea.ac.kr
+ *  Modified by: Haoran Wang
+ *  Revision date: 2026-08-12
  */
 
 #include "lesta/core/TraversabilityEstimator.h"

@@ -1,9 +1,8 @@
 """
-Author: Ikhyeon Cho
-Link: https://github.com/Ikhyeon-Cho
-File: logger/logger.py
-Date: 2025/02/21 18:50
+Modified by: Haoran Wang
+Revision date: 2026-08-12
 """
+
 
 from dataclasses import dataclass
 from .console import Logger as ConsoleLogger

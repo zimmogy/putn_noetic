@@ -1,10 +1,8 @@
 /*
  * label_generation_node.cpp
  *
- *  Created on: Aug 17, 2023
- *      Author: Ikhyeon Cho
- *	 Institute: Korea Univ. ISR (Intelligent Systems & Robotics) Lab
- *       Email: tre0430@korea.ac.kr
+ *  Modified by: Haoran Wang
+ *  Revision date: 2026-08-12
  */
 
 #include "lesta/ros/label_generation_node.h"
@@ -81,7 +79,6 @@ void LabelGenerationNode::initializePubSubs() {
                                                 1);
 
   if (cfg_.debug_mode) {
-    // TODO: Add debug publishers
   }
 }
 
@@ -226,7 +223,6 @@ void LabelGenerationNode::publishLabelMap(const ros::TimerEvent &event) {
                                      lesta::layers::Feature::VARIANCE,
                                      lesta::layers::Label::FOOTPRINT,
                                      lesta::layers::Label::TRAVERSABILITY,
-                                     // 新增的可视化层
                                      lesta::layers::Feature::INTENSITY_MEAN,
                                      lesta::layers::Feature::INTENSITY_VAR,
                                      lesta::layers::Feature::SPARSITY};
