@@ -6,6 +6,7 @@
  */
 
 #include <ros/ros.h>
+#include <grid_map_msgs/GridMap.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <visualization_msgs/Marker.h>
 
@@ -71,6 +72,7 @@ private:
   ros::Publisher pub_filtered_scan_;
   ros::Publisher pub_rasterized_scan_;
   ros::Publisher pub_travmap_;
+  ros::Publisher pub_travgridmap_;
   ros::Publisher pub_map_region_;
 
   // Timers

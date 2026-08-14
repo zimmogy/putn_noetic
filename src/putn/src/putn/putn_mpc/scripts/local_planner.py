@@ -21,7 +21,8 @@ class Local_Planner():
         self.ref_path_close_set = False
         self.target_state = np.array([-1,4,np.pi/2])
         self.target_state_close = np.zeros(3)
-        self.desired_global_path = [ np.zeros([300,4]) , 0]
+        self.max_global_path_points = rospy.get_param('/local_planner/max_global_path_points', 0)
+        self.desired_global_path = [np.zeros([0, 4]), 0]
         self.have_plan = False
         self.is_close = False
         self.is_get = False
@@ -147,10 +148,15 @@ class Local_Planner():
     
 
     def find_min_distance(self,c1):
+        if self.desired_global_path[1] <= 0:
+            return 0
         number =  np.argmin( np.array([self.distance_global(c1,self.desired_global_path[0][i]) for i in range(self.desired_global_path[1])]) )
         return number
 
     def choose_goal_state(self):
+        if self.desired_global_path[1] <= 0:
+            self.ref_path_set = False
+            return
         num = self.find_min_distance(self.curr_state)
         scale = 1
         num_list = []
@@ -175,24 +181,52 @@ class Local_Planner():
 
     def _global_path_callback(self, data):
         if(len(data.data)!=0):
-            self.ref_path_set = True
             size = len(data.data)//3
-            self.desired_global_path[1]=size
-            for i in range(int(size)):
-                self.desired_global_path[0][i,0]=data.data[3*(size-i)-3]
-                self.desired_global_path[0][i,1]=data.data[3*(size-i)-2]
-                self.desired_global_path[0][i,2]=data.data[3*(size-i)-1]
+            path_size = int(size)
+            if int(self.max_global_path_points) > 0:
+                path_size = min(path_size, int(self.max_global_path_points))
+            if int(size) > path_size:
+                rospy.logwarn_throttle(
+                    2.0,
+                    "Global path has %d points; truncating to %d points for local planner.",
+                    int(size),
+                    path_size,
+                )
+            path = np.zeros([path_size, 4])
+            for i in range(path_size):
+                path[i,0]=data.data[3*(size-i)-3]
+                path[i,1]=data.data[3*(size-i)-2]
+                path[i,2]=data.data[3*(size-i)-1]
+            self.desired_global_path = [path, path_size]
+            self.ref_path_set = path_size > 0
+        else:
+            self.desired_global_path = [np.zeros([0, 4]), 0]
+            self.ref_path_set = False
     
     def _global_path_callback2(self, data):
         if(len(data.data)!=0):
-            self.ref_path_set = True
             size = len(data.data)//5
-            self.desired_global_path[1]=size
-            for i in range(int(size)):
-                self.desired_global_path[0][i,0]=data.data[5*(size-i)-5]
-                self.desired_global_path[0][i,1]=data.data[5*(size-i)-4]
-                self.desired_global_path[0][i,2]=data.data[5*(size-i)-2]
-                self.desired_global_path[0][i,3]=data.data[5*(size-i)-1]
+            path_size = int(size)
+            if int(self.max_global_path_points) > 0:
+                path_size = min(path_size, int(self.max_global_path_points))
+            if int(size) > path_size:
+                rospy.logwarn_throttle(
+                    2.0,
+                    "Predicted global path has %d points; truncating to %d points for local planner.",
+                    int(size),
+                    path_size,
+                )
+            path = np.zeros([path_size, 4])
+            for i in range(path_size):
+                path[i,0]=data.data[5*(size-i)-5]
+                path[i,1]=data.data[5*(size-i)-4]
+                path[i,2]=data.data[5*(size-i)-2]
+                path[i,3]=data.data[5*(size-i)-1]
+            self.desired_global_path = [path, path_size]
+            self.ref_path_set = path_size > 0
+        else:
+            self.desired_global_path = [np.zeros([0, 4]), 0]
+            self.ref_path_set = False
             
     def cmd(self, data):
         

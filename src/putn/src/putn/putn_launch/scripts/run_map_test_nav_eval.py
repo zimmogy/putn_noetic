@@ -34,10 +34,62 @@ def rect_distance(point, center, size):
     return math.hypot(dx, dy)
 
 
+def is_within_start_tolerance(pos, start, tolerance):
+    return dist2d(pos, start) <= tolerance
+
+
 def path_length(points):
     if len(points) < 2:
         return 0.0
     return sum(dist2d(points[i - 1], points[i]) for i in range(1, len(points)))
+
+
+def read_point_param(prefix):
+    names = ["~{}_x".format(prefix), "~{}_y".format(prefix), "~{}_z".format(prefix)]
+    present = [rospy.has_param(name) for name in names]
+    if not any(present):
+        return None
+    if not all(present):
+        raise ValueError("Provide all of {}, {}, and {}".format(*names))
+    return [float(rospy.get_param(name)) for name in names]
+
+
+def build_single_task_from_params():
+    start = read_point_param("start")
+    goal = read_point_param("goal")
+    if start is None and goal is None:
+        return None
+    if start is None or goal is None:
+        raise ValueError("Provide both start_x/start_y/start_z and goal_x/goal_y/goal_z")
+    return {
+        "id": rospy.get_param("~task_id", "single_start_goal"),
+        "category": rospy.get_param("~task_category", "single"),
+        "start": start,
+        "goal": goal,
+        "note": rospy.get_param("~task_note", "single launch-configured start/goal task"),
+    }
+
+
+def read_warmup_cmd_sequence_param():
+    sequence_text = rospy.get_param("~warmup_cmd_sequence", "")
+    if not sequence_text:
+        return []
+
+    phases = []
+    for raw_phase in sequence_text.split(";"):
+        raw_phase = raw_phase.strip()
+        if not raw_phase:
+            continue
+        values = [item.strip() for item in raw_phase.split(",")]
+        if len(values) != 3:
+            raise ValueError(
+                "Each warmup_cmd_sequence phase must be linear,angular,duration; got '{}'".format(raw_phase)
+            )
+        linear, angular, duration = [float(value) for value in values]
+        if duration <= 0.0:
+            raise ValueError("Warmup command duration must be positive; got '{}'".format(raw_phase))
+        phases.append((linear, angular, duration))
+    return phases
 
 
 class MapTestNavEval:
@@ -45,6 +97,7 @@ class MapTestNavEval:
         self.config_path = rospy.get_param("~config_path", self.default_config_path())
         self.output_dir = os.path.expanduser(rospy.get_param("~output_dir", "~/.ros/putn_nav_eval"))
         self.method = rospy.get_param("~method", "lesta_putn")
+        self.scene = rospy.get_param("~scene", "")
         self.robot_model_name = rospy.get_param("~robot_model_name", "scout/")
         self.goal_topic = rospy.get_param("~goal_topic", "/goal")
         self.cmd_vel_topic = rospy.get_param("~cmd_vel_topic", "/cmd_vel")
@@ -60,6 +113,10 @@ class MapTestNavEval:
         self.goal_publish_count = rospy.get_param("~goal_publish_count", 5)
         self.pre_goal_warmup_s = rospy.get_param("~pre_goal_warmup_s", 25.0)
         self.hold_goal_clear_s = rospy.get_param("~hold_goal_clear_s", 3.0)
+        self.warmup_mode = rospy.get_param("~warmup_mode", "stationary")
+        self.warmup_cmd_sequence = read_warmup_cmd_sequence_param()
+        self.warmup_reset_to_start = rospy.get_param("~warmup_reset_to_start", False)
+        self.warmup_end_requires_start = rospy.get_param("~warmup_end_requires_start", True)
         self.path_grace_s = rospy.get_param("~path_grace_s", 20.0)
         self.risk_sample_radius_m = rospy.get_param("~risk_sample_radius_m", 0.75)
         self.enable_cmd_follower = rospy.get_param("~enable_cmd_follower", True)
@@ -74,10 +131,14 @@ class MapTestNavEval:
             self.config = yaml.safe_load(f)
 
         self.eval_cfg = self.config["evaluation"]
+        if not self.scene:
+            self.scene = self.eval_cfg.get("scene", "")
         self.criteria = self.eval_cfg["success_criteria"]
-        self.tasks = self.config["tasks"]
-        self.pits = self.config["map"]["pits"]
-        self.columns = self.config["map"]["columns"]
+        single_task = build_single_task_from_params()
+        self.tasks = [single_task] if single_task is not None else self.config["tasks"]
+        map_cfg = self.config.get("map", {})
+        self.pits = map_cfg.get("pits", [])
+        self.columns = map_cfg.get("columns", [])
         self.output_fields = self.eval_cfg["output_fields"]
 
         self.pose = None
@@ -217,12 +278,78 @@ class MapTestNavEval:
             self.goal_pub.publish(msg)
             rospy.sleep(0.2)
 
-    def warm_up_planner(self, start):
-        if self.pre_goal_warmup_s <= 0.0:
-            return
+    def run_fixed_motion_warmup(self, start):
+        if not self.warmup_cmd_sequence:
+            rospy.logwarn("warmup_mode:=fixed_motion requested but warmup_cmd_sequence is empty")
+            return True
 
         rospy.loginfo(
-            "Warming up PUTN planner for %.1f seconds before sending the evaluation goal",
+            "Running fixed-motion warmup with %d command phases before evaluation",
+            len(self.warmup_cmd_sequence),
+        )
+        rate = rospy.Rate(10)
+        for index, (linear, angular, duration) in enumerate(self.warmup_cmd_sequence, start=1):
+            rospy.loginfo(
+                "Warmup phase %d: linear=%.3f angular=%.3f duration=%.1f",
+                index,
+                linear,
+                angular,
+                duration,
+            )
+            cmd = Twist()
+            cmd.linear.x = linear
+            cmd.angular.z = angular
+            deadline = time.time() + duration
+            while not rospy.is_shutdown() and time.time() < deadline:
+                self.cmd_pub.publish(cmd)
+                rate.sleep()
+
+        self.cmd_pub.publish(Twist())
+        rospy.sleep(self.reset_settle_s)
+
+        if self.warmup_reset_to_start:
+            if self.start_mode == "gazebo":
+                rospy.loginfo("Resetting robot to fixed episode start after warmup")
+                self.reset_robot_pose_gazebo(start)
+            else:
+                rospy.logwarn(
+                    "warmup_reset_to_start is true, but start_mode is '%s'. "
+                    "For fixed-start simulation tests use start_mode:=gazebo.",
+                    self.start_mode,
+                )
+
+        if self.warmup_end_requires_start:
+            if not self.wait_for_pose():
+                rospy.logwarn("No robot pose received after warmup")
+                return False
+            pos = (self.pose.position.x, self.pose.position.y)
+            distance_to_start = dist2d(pos, start)
+            if not is_within_start_tolerance(pos, start, self.start_tolerance_m):
+                rospy.logwarn(
+                    "Warmup ended %.2f m from the configured start; tolerance is %.2f m",
+                    distance_to_start,
+                    self.start_tolerance_m,
+                )
+                return False
+
+        return True
+
+    def warm_up_planner(self, start):
+        if self.pre_goal_warmup_s <= 0.0:
+            return True
+
+        if self.warmup_mode == "none":
+            return True
+        if self.warmup_mode == "fixed_motion":
+            if not self.run_fixed_motion_warmup(start):
+                return False
+            self.reset_episode_state()
+            return True
+        if self.warmup_mode != "stationary":
+            raise ValueError("Unsupported warmup_mode: {}".format(self.warmup_mode))
+
+        rospy.loginfo(
+            "Warming up PUTN planner at the episode start for %.1f seconds before sending the evaluation goal",
             self.pre_goal_warmup_s,
         )
         self.publish_goal(start)
@@ -235,6 +362,7 @@ class MapTestNavEval:
             self.cmd_pub.publish(Twist())
             rate.sleep()
         self.reset_episode_state()
+        return True
 
     def navigate_to_start(self, start):
         if not self.wait_for_pose():
@@ -293,9 +421,15 @@ class MapTestNavEval:
         raise ValueError("Unsupported start_mode: {}".format(self.start_mode))
 
     def distances_to_hazards(self, point):
-        min_pit = min(rect_distance(point, pit["center"], pit["size"]) for pit in self.pits)
-        min_column = min(
-            max(dist2d(point, col["center"]) - col["radius_m"], 0.0) for col in self.columns
+        min_pit = (
+            min(rect_distance(point, pit["center"], pit["size"]) for pit in self.pits)
+            if self.pits
+            else float("inf")
+        )
+        min_column = (
+            min(max(dist2d(point, col["center"]) - col["radius_m"], 0.0) for col in self.columns)
+            if self.columns
+            else float("inf")
         )
         return min_pit, min_column
 
@@ -358,7 +492,23 @@ class MapTestNavEval:
                 "max_fused_risk": "",
                 "replan_count": 0,
             }
-        self.warm_up_planner(task["start"])
+        if not self.warm_up_planner(task["start"]):
+            return {
+                "episode_id": episode_id,
+                "task_id": task["id"],
+                "run_id": run_id,
+                "method": self.method,
+                "success": 0,
+                "failure_reason": "warmup_not_at_start",
+                "time_to_goal": "0.000",
+                "path_length": "0.000",
+                "planned_path_length": "0.000",
+                "min_distance_to_pit": "",
+                "min_distance_to_column": "",
+                "mean_fused_risk": "",
+                "max_fused_risk": "",
+                "replan_count": 0,
+            }
         self.publish_goal(task["goal"])
 
         start_wall = time.time()
@@ -391,10 +541,10 @@ class MapTestNavEval:
             if math.degrees(max(abs(roll), abs(pitch))) > self.criteria["roll_pitch_fail_deg"]:
                 failure_reason = "collision"
                 break
-            if pit_d <= self.criteria["pit_margin_m"]:
+            if self.pits and pit_d <= self.criteria["pit_margin_m"]:
                 failure_reason = "pit"
                 break
-            if column_d <= self.criteria["column_margin_m"]:
+            if self.columns and column_d <= self.criteria["column_margin_m"]:
                 failure_reason = "collision"
                 break
             if dist2d(pos, task["goal"]) <= self.criteria["goal_tolerance_m"]:
@@ -430,8 +580,8 @@ class MapTestNavEval:
             "time_to_goal": "{:.3f}".format(duration if success else 0.0),
             "path_length": "{:.3f}".format(path_length(actual_points)),
             "planned_path_length": "{:.3f}".format(path_length(self.latest_path_points)),
-            "min_distance_to_pit": "{:.3f}".format(min_pit),
-            "min_distance_to_column": "{:.3f}".format(min_column),
+            "min_distance_to_pit": "{:.3f}".format(min_pit) if self.pits else "",
+            "min_distance_to_column": "{:.3f}".format(min_column) if self.columns else "",
             "mean_fused_risk": "{:.3f}".format(sum(risk_values) / len(risk_values)) if risk_values else "",
             "max_fused_risk": "{:.3f}".format(max(risk_values)) if risk_values else "",
             "replan_count": max(self.path_messages - 1, 0),
@@ -445,9 +595,10 @@ class MapTestNavEval:
         os.makedirs(self.output_dir, exist_ok=True)
         stamp = time.strftime("%Y%m%d_%H%M%S")
         out_path = os.path.join(self.output_dir, "{}_{}.csv".format(self.eval_cfg["name"], stamp))
-        runs_per_task = int(self.eval_cfg["runs_per_task"])
+        runs_per_task = int(rospy.get_param("~runs", self.eval_cfg.get("runs_per_task", 1)))
 
         rospy.loginfo("Writing navigation evaluation CSV to %s", out_path)
+        rospy.loginfo("Evaluation scene=%s tasks=%d runs_per_task=%d", self.scene, len(self.tasks), runs_per_task)
         with open(out_path, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=self.output_fields)
             writer.writeheader()

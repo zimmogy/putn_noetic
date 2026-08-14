@@ -16,7 +16,7 @@ if os.name != 'nt':
     settings = termios.tcgetattr(sys.stdin)
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Path
-from std_msgs.msg import Float32MultiArray, Float32, Int16
+from std_msgs.msg import Float32MultiArray, Float32, Int16, String
 
 
 class Controller():
@@ -29,6 +29,8 @@ class Controller():
         self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
         self.pub2 = rospy.Publisher(
             '/curr_state', Float32MultiArray, queue_size=10)
+        self.mode_pub = rospy.Publisher('/controller/mode', String, queue_size=1, latch=True)
+        self.mode_cmd_sub = rospy.Subscriber('/controller/mode_cmd', String, self.mode_cmd_cb, queue_size=1)
         self.__timer_localization = rospy.Timer(
             rospy.Duration(0.01), self.get_current_state)
         self.listener = tf.TransformListener()
@@ -37,7 +39,27 @@ class Controller():
         self.time_sol = 0
         self.local_plan = np.zeros([self.N, 2])
         self.control_cmd = Twist()
+        self.requested_mode = 'manual'
+        self.current_mode = 'manual'
+        self.publish_mode()
         self.control_loop()
+
+    def publish_mode(self):
+        self.mode_pub.publish(String(data=self.current_mode))
+
+    def set_mode(self, mode):
+        if mode == self.current_mode:
+            return
+        self.current_mode = mode
+        rospy.loginfo("Controller mode switched to %s", mode)
+        self.publish_mode()
+
+    def mode_cmd_cb(self, msg):
+        mode = msg.data.strip().lower()
+        if mode not in ('manual', 'auto'):
+            rospy.logwarn("Ignoring unsupported controller mode request: %s", msg.data)
+            return
+        self.requested_mode = mode
 
     def quart_to_rpy(self, x, y, z, w):
         r = math.atan2(2*(w*x+y*z), 1-2*(x*x+y*y))
@@ -92,18 +114,23 @@ class Controller():
         self.cmd(np.array([0.0, 0.0]))
 
     def auto(self):
+        self.set_mode('auto')
         while not rospy.is_shutdown():
             key = self.getKey()
-            if key == 'q':
+            if key == 'q' or self.requested_mode == 'manual':
+                self.requested_mode = 'manual'
                 return True
             ref_inputs = self.local_plan[0]
             self.cmd(ref_inputs)
             self.rate.sleep()
 
     def manual(self):
+        self.set_mode('manual')
         data = np.array([0.0, 0.0])
         while not rospy.is_shutdown():
             key = self.getKey()
+            if self.requested_mode == 'auto':
+                return True
             if key == 'w':
                 if(data[0] < 0.6):
                     data[0] += 0.2
@@ -163,6 +190,7 @@ class Controller():
             elif key == 's':
                 data = np.array([0.0, 0.0])
             elif key == 'i':
+                self.requested_mode = 'auto'
                 return True
             elif (key == '\x03'):
                 return False

@@ -1,36 +1,72 @@
 <launch>
-  <arg name="scene" default="map_test"/>
+  <arg name="scene" default="map1"/>
+  <arg name="use_lesta" default="true"/>
   <arg name="lesta_model_path" default="/home/whr/下载/epoch_best.pt"/>
   <arg name="lesta_putn_weight" default="0.3"/>
   <arg name="lesta_weight" default="0.7"/>
   <arg name="lesta_unknown_penalty" default="0.0"/>
   <arg name="lesta_risk_threshold" default="0.75"/>
+  <arg name="lesta_map_source" default="prediction"/>
+  <arg name="launch_local_control" default="false"/>
+  <arg name="task_id" default="single_start_goal"/>
+  <arg name="runs" default="1"/>
+  <arg name="start_x" default="0.0"/>
+  <arg name="start_y" default="0.0"/>
+  <arg name="start_z" default="0.0"/>
+  <arg name="spawn_z_offset" default="1.0"/>
+  <arg name="spawn_yaw" default="0.0"/>
+  <arg name="goal_x" default="6.0"/>
+  <arg name="goal_y" default="0.0"/>
+  <arg name="goal_z" default="0.0"/>
 
   <arg name="config_path" default="$(find putn_launch)/config/map_test_nav_eval.yaml"/>
   <arg name="output_dir" default="$(env HOME)/.ros/putn_nav_eval"/>
   <arg name="method" default="lesta_putn"/>
   <arg name="initial_delay_s" default="45.0"/>
-  <arg name="start_mode" default="navigate"/>
+  <arg name="start_mode" default="gazebo"/>
   <arg name="reposition_timeout_s" default="180.0"/>
   <arg name="pre_goal_warmup_s" default="25.0"/>
+  <arg name="warmup_mode" default="fixed_motion"/>
+  <arg name="warmup_cmd_sequence" default="0.18,0.00,8.0;0.00,0.45,3.49;0.18,0.00,8.0;0.00,0.45,3.49;0.18,0.00,8.0;0.00,0.45,3.49;0.18,0.00,8.0;0.00,0.45,3.49"/>
+  <arg name="warmup_reset_to_start" default="false"/>
+  <arg name="warmup_end_requires_start" default="true"/>
 
-  <include file="$(find putn_launch)/launch/fusion_simulation.launch">
+  <include file="$(find putn_launch)/launch/simulation.launch">
     <arg name="scene" value="$(arg scene)"/>
+    <arg name="use_lesta" value="$(arg use_lesta)"/>
     <arg name="lesta_model_path" value="$(arg lesta_model_path)"/>
     <arg name="lesta_putn_weight" value="$(arg lesta_putn_weight)"/>
     <arg name="lesta_weight" value="$(arg lesta_weight)"/>
     <arg name="lesta_unknown_penalty" value="$(arg lesta_unknown_penalty)"/>
     <arg name="lesta_risk_threshold" value="$(arg lesta_risk_threshold)"/>
-    <arg name="launch_local_control" value="false"/>
+    <arg name="lesta_map_source" value="$(arg lesta_map_source)"/>
+    <arg name="launch_local_control" value="$(arg launch_local_control)"/>
+    <arg name="spawn_x" value="$(arg start_x)"/>
+    <arg name="spawn_y" value="$(arg start_y)"/>
+    <arg name="spawn_z" value="$(eval float(arg('start_z')) + float(arg('spawn_z_offset')))"/>
+    <arg name="spawn_yaw" value="$(arg spawn_yaw)"/>
   </include>
 
   <include file="$(find putn_launch)/launch/map_test_nav_eval.launch">
     <arg name="config_path" value="$(arg config_path)"/>
     <arg name="output_dir" value="$(arg output_dir)"/>
     <arg name="method" value="$(arg method)"/>
+    <arg name="scene" value="$(arg scene)"/>
+    <arg name="task_id" value="$(arg task_id)"/>
+    <arg name="runs" value="$(arg runs)"/>
+    <arg name="start_x" value="$(arg start_x)"/>
+    <arg name="start_y" value="$(arg start_y)"/>
+    <arg name="start_z" value="$(arg start_z)"/>
+    <arg name="goal_x" value="$(arg goal_x)"/>
+    <arg name="goal_y" value="$(arg goal_y)"/>
+    <arg name="goal_z" value="$(arg goal_z)"/>
     <arg name="initial_delay_s" value="$(arg initial_delay_s)"/>
     <arg name="start_mode" value="$(arg start_mode)"/>
     <arg name="reposition_timeout_s" value="$(arg reposition_timeout_s)"/>
     <arg name="pre_goal_warmup_s" value="$(arg pre_goal_warmup_s)"/>
+    <arg name="warmup_mode" value="$(arg warmup_mode)"/>
+    <arg name="warmup_cmd_sequence" value="$(arg warmup_cmd_sequence)"/>
+    <arg name="warmup_reset_to_start" value="$(arg warmup_reset_to_start)"/>
+    <arg name="warmup_end_requires_start" value="$(arg warmup_end_requires_start)"/>
   </include>
 </launch>

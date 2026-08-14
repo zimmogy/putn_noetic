@@ -6,15 +6,26 @@
   <arg name="lesta_weight" default="0.7"/>
   <arg name="lesta_unknown_penalty" default="0.0"/>
   <arg name="lesta_risk_threshold" default="0.75"/>
+  <arg name="lesta_map_source" default="prediction"/>
+  <arg name="lesta_mapping_map_length_x" default="40.0"/>
+  <arg name="lesta_mapping_map_length_y" default="40.0"/>
+  <arg name="lesta_mapping_grid_resolution" default="0.1"/>
+  <arg name="launch_rviz" default="true"/>
+  <arg name="rviz_required" default="false"/>
   <arg name="scout_urdf_extras" default="$(find scout_description)/urdf/scout_v2_rgb_camera.xacro"/>
   <arg name="launch_local_control" default="true"/>
+  <arg name="spawn_x" default="0"/>
+  <arg name="spawn_y" default="0"/>
+  <arg name="spawn_z" default="1"/>
+  <arg name="spawn_yaw" default="0.0"/>
 
   <include file="$(find putn_map)/launch/$(arg scene).launch"/>
 
   <include file="$(find scout_gazebo_sim)/launch/spawn_scout_v2.launch">
-    <arg name="x" value="0"/>
-    <arg name="y" value="0"/>
-    <arg name="z" value="1"/>
+    <arg name="x" value="$(arg spawn_x)"/>
+    <arg name="y" value="$(arg spawn_y)"/>
+    <arg name="z" value="$(arg spawn_z)"/>
+    <arg name="yaw" value="$(arg spawn_yaw)"/>
     <arg name="urdf_extras" value="$(arg scout_urdf_extras)"/>
   </include>
 
@@ -25,7 +36,7 @@
   <node pkg="tf" type="static_transform_publisher" name="world_to_camera_init" args="0 0 0 0 0 0 /world /camera_init 10" /><!--10ms-->
   <node pkg="tf" type="static_transform_publisher" name="camera_to_link" args="0 0 -0.4 0 0 0 /aft_mapped /base_link 10" />
 
-  <group if="$(arg use_lesta)">
+  <group if="$(eval arg('use_lesta') and arg('lesta_map_source') == 'prediction')">
     <node pkg="lesta" type="trav_prediction_node" name="lesta_trav_prediction" output="screen">
       <rosparam command="load" subst_value="true" file="$(find lesta)/config/trav_prediction_node.yaml" />
       <rosparam command="load" subst_value="true" file="$(find lesta)/config/include/feature_extraction_params.yaml" />
@@ -41,6 +52,25 @@
     </node>
   </group>
 
+  <group if="$(eval arg('use_lesta') and arg('lesta_map_source') == 'mapping')">
+    <node pkg="lesta" type="trav_mapping_node" name="lesta_trav_mapping" output="screen">
+      <rosparam command="load" subst_value="true" file="$(find lesta)/config/trav_mapping_node.yaml" />
+      <rosparam command="load" subst_value="true" file="$(find lesta)/config/include/feature_extraction_params.yaml" />
+      <param name="node/lidarscan_topic" value="/velodyne_points"/>
+      <param name="frame_id/robot_frame" value="base_link"/>
+      <param name="frame_id/map_frame" value="world"/>
+      <param name="height_mapper/frame_id" value="world"/>
+      <param name="height_mapper/map_length_x" value="$(arg lesta_mapping_map_length_x)"/>
+      <param name="height_mapper/map_length_y" value="$(arg lesta_mapping_map_length_y)"/>
+      <param name="height_mapper/grid_resolution" value="$(arg lesta_mapping_grid_resolution)"/>
+      <param name="traversability_mapper/model_path" value="$(arg lesta_model_path)"/>
+    </node>
+
+    <node pkg="grid_map_visualization" type="grid_map_visualization" name="lesta_mapping_visualization" output="log">
+      <rosparam command="load" file="$(find lesta)/config/include/mapping_visualization.yaml" />
+    </node>
+  </group>
+
   <node pkg="waypoint_generator" name="waypoint_generator" type="waypoint_generator">
       <remap from="~goal" to="/goal"/>
       <param name="waypoint_type" value="manual-lonely-waypoint"/>    
@@ -49,7 +79,8 @@
   <node pkg="putn" type="global_planning_node" name="global_planning_node" output="screen" required = "true">
       <remap from="~waypoints"       to="/waypoint_generator/waypoints"/>
       <remap from="~map"             to="/laser_cloud_map"/> 
-      <remap from="~lesta_traversability" to="/lesta/prediction/traversability"/>
+      <remap if="$(eval arg('lesta_map_source') == 'prediction')" from="~lesta_traversability" to="/lesta/prediction/traversability"/>
+      <remap if="$(eval arg('lesta_map_source') == 'mapping')" from="~lesta_traversability" to="/lesta/mapping/traversability_grid_map"/>
 
       <rosparam command="load" file="$(find putn)/config/for_simulation/$(arg scene).yaml"/>
       <param name="planning/use_lesta_traversability" value="$(arg use_lesta)"/>
@@ -57,6 +88,10 @@
       <param name="planning/lesta_weight" value="$(arg lesta_weight)"/>
       <param name="planning/lesta_unknown_penalty" value="$(arg lesta_unknown_penalty)"/>
       <param name="planning/lesta_risk_threshold" value="$(arg lesta_risk_threshold)"/>
+      <param if="$(eval arg('lesta_map_source') == 'prediction')" name="planning/lesta_probability_layer" value="traversability/probability"/>
+      <param if="$(eval arg('lesta_map_source') == 'prediction')" name="planning/lesta_binary_layer" value="traversability/binary"/>
+      <param if="$(eval arg('lesta_map_source') == 'mapping')" name="planning/lesta_probability_layer" value="mapping/probability"/>
+      <param if="$(eval arg('lesta_map_source') == 'mapping')" name="planning/lesta_binary_layer" value="mapping/binary"/>
   </node>
 
   <node pkg="putn" type="local_obs_node" name="local_obs_node" output="screen" required = "true">
@@ -75,7 +110,9 @@
       <param name="file/cfg_path" type="string" value="$(find gpr)/config/hyperparam.txt"/>
   </node>
 
-  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find putn_launch)/rviz_config/simulation.rviz" required="true"/>
+  <group if="$(arg launch_rviz)">
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find putn_launch)/rviz_config/simulation.rviz" required="$(arg rviz_required)"/>
+  </group>
 
   <group if="$(arg launch_local_control)">
     <node name="local_planner" pkg="local_planner" type="local_planner.py" launch-prefix="gnome-terminal --title=local_planner --"/>

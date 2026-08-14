@@ -1,20 +1,33 @@
 <launch>
   <arg name="scene" default="map1"/>
-  <arg name="lesta_model_path" default="/home/whr/下载/epoch_best.pt"/>
-  <arg name="lesta_putn_weight" default="0.3"/>
-  <arg name="lesta_weight" default="0.7"/>
-  <arg name="lesta_unknown_penalty" default="0.0"/>
-  <arg name="lesta_risk_threshold" default="0.75"/>
+  <arg name="use_lesta" default="false"/>
+  <arg name="lesta_model_path" default="/home/whr/Data/test_pt/proposed/epoch_best.pt"/>
+  <arg name="lesta_putn_weight" default="1.0"/>
+  <arg name="lesta_weight" default="0.0"/>
+  <arg name="lesta_unknown_penalty" default="0.4"/>
+  <arg name="lesta_risk_threshold" default="0.65"/>
+  <arg name="lesta_map_source" default="mapping"/>
+  <arg name="lesta_mapping_map_length_x" default="40.0"/>
+  <arg name="lesta_mapping_map_length_y" default="40.0"/>
+  <arg name="lesta_mapping_grid_resolution" default="0.1"/>
+  <arg name="launch_rviz" default="true"/>
+  <arg name="rviz_required" default="false"/>
   <arg name="launch_local_control" default="true"/>
 
   <include file="$(find putn_launch)/launch/simulation.launch">
     <arg name="scene" value="$(arg scene)"/>
-    <arg name="use_lesta" value="true"/>
+    <arg name="use_lesta" value="$(arg use_lesta)"/>
     <arg name="lesta_model_path" value="$(arg lesta_model_path)"/>
     <arg name="lesta_putn_weight" value="$(arg lesta_putn_weight)"/>
     <arg name="lesta_weight" value="$(arg lesta_weight)"/>
     <arg name="lesta_unknown_penalty" value="$(arg lesta_unknown_penalty)"/>
     <arg name="lesta_risk_threshold" value="$(arg lesta_risk_threshold)"/>
+    <arg name="lesta_map_source" value="$(arg lesta_map_source)"/>
+    <arg name="lesta_mapping_map_length_x" value="$(arg lesta_mapping_map_length_x)"/>
+    <arg name="lesta_mapping_map_length_y" value="$(arg lesta_mapping_map_length_y)"/>
+    <arg name="lesta_mapping_grid_resolution" value="$(arg lesta_mapping_grid_resolution)"/>
+    <arg name="launch_rviz" value="$(arg launch_rviz)"/>
+    <arg name="rviz_required" value="$(arg rviz_required)"/>
     <arg name="launch_local_control" value="$(arg launch_local_control)"/>
   </include>
 </launch>

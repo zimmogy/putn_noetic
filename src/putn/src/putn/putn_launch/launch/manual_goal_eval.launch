@@ -1,0 +1,43 @@
+<launch>
+  <arg name="goal_x"/>
+  <arg name="goal_y"/>
+  <arg name="goal_z" default="0.0"/>
+  <arg name="task_id" default="manual_goal"/>
+  <arg name="method" default="manual"/>
+  <arg name="goal_topic" default="/goal"/>
+  <arg name="model_states_topic" default="/gazebo/model_states"/>
+  <arg name="robot_model_name" default="scout/"/>
+  <arg name="fixed_frame" default="world"/>
+  <arg name="goal_tolerance_m" default="0.8"/>
+  <arg name="roll_pitch_fail_deg" default="45.0"/>
+  <arg name="timeout_s" default="180.0"/>
+  <arg name="goal_publish_count" default="5"/>
+  <arg name="auto_manage_controller" default="true"/>
+  <arg name="controller_mode_topic" default="/controller/mode"/>
+  <arg name="controller_mode_cmd_topic" default="/controller/mode_cmd"/>
+  <arg name="controller_mode_wait_s" default="3.0"/>
+  <arg name="require_manual_before_exit" default="true"/>
+  <arg name="output_dir" default="$(env HOME)/.ros/putn_manual_goal_eval"/>
+
+  <node pkg="putn_launch" type="run_manual_goal_eval.py" name="manual_goal_eval" output="screen">
+    <param name="goal_x" value="$(arg goal_x)"/>
+    <param name="goal_y" value="$(arg goal_y)"/>
+    <param name="goal_z" value="$(arg goal_z)"/>
+    <param name="task_id" value="$(arg task_id)"/>
+    <param name="method" value="$(arg method)"/>
+    <param name="goal_topic" value="$(arg goal_topic)"/>
+    <param name="model_states_topic" value="$(arg model_states_topic)"/>
+    <param name="robot_model_name" value="$(arg robot_model_name)"/>
+    <param name="fixed_frame" value="$(arg fixed_frame)"/>
+    <param name="goal_tolerance_m" value="$(arg goal_tolerance_m)"/>
+    <param name="roll_pitch_fail_deg" value="$(arg roll_pitch_fail_deg)"/>
+    <param name="timeout_s" value="$(arg timeout_s)"/>
+    <param name="goal_publish_count" value="$(arg goal_publish_count)"/>
+    <param name="auto_manage_controller" value="$(arg auto_manage_controller)"/>
+    <param name="controller_mode_topic" value="$(arg controller_mode_topic)"/>
+    <param name="controller_mode_cmd_topic" value="$(arg controller_mode_cmd_topic)"/>
+    <param name="controller_mode_wait_s" value="$(arg controller_mode_wait_s)"/>
+    <param name="require_manual_before_exit" value="$(arg require_manual_before_exit)"/>
+    <param name="output_dir" value="$(arg output_dir)"/>
+  </node>
+</launch>

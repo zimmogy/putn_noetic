@@ -8,6 +8,7 @@
 #include "lesta/ros/trav_mapping_node.h"
 #include "lesta/ros/config.h"
 
+#include <grid_map_ros/GridMapRosConverter.hpp>
 #include <pcl_conversions/pcl_conversions.h>
 #include <sensor_msgs/point_cloud2_iterator.h>
 
@@ -65,6 +66,8 @@ void TravMappingNode::initializePubSubs() {
       nh_.advertise<sensor_msgs::PointCloud2>("/lesta/mapping/scan_rasterized", 1);
   pub_travmap_ =
       nh_.advertise<sensor_msgs::PointCloud2>("/lesta/mapping/traversability", 1);
+  pub_travgridmap_ =
+      nh_.advertise<grid_map_msgs::GridMap>("/lesta/mapping/traversability_grid_map", 1);
   pub_map_region_ =
       nh_.advertise<visualization_msgs::Marker>("/lesta/mapping/mapping_region", 1);
 
@@ -239,6 +242,16 @@ void TravMappingNode::publishTravMap(const HeightMap &heightmap,
   sensor_msgs::PointCloud2 msg;
   toPointCloud2(heightmap, layers, indices, msg);
   pub_travmap_.publish(msg);
+
+  std::vector<std::string> grid_layers = {
+      height_mapping::layers::Height::ELEVATION,
+      lesta::layers::Traversability::PROBABILITY,
+      lesta::layers::Traversability::BINARY,
+      lesta::layers::Traversability::LOG_ODDS_PROBABILITY,
+      lesta::layers::Traversability::LOG_ODDS_BINARY};
+  grid_map_msgs::GridMap grid_msg;
+  grid_map::GridMapRosConverter::toMessage(heightmap, grid_layers, grid_msg);
+  pub_travgridmap_.publish(grid_msg);
 }
 
 void TravMappingNode::publishMapRegion(const HeightMap &map) {

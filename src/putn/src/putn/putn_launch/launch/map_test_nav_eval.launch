@@ -2,6 +2,15 @@
   <arg name="config_path" default="$(find putn_launch)/config/map_test_nav_eval.yaml"/>
   <arg name="output_dir" default="$(env HOME)/.ros/putn_nav_eval"/>
   <arg name="method" default="lesta_putn"/>
+  <arg name="scene" default="map1"/>
+  <arg name="task_id" default="single_start_goal"/>
+  <arg name="runs" default="1"/>
+  <arg name="start_x" default="0.0"/>
+  <arg name="start_y" default="0.0"/>
+  <arg name="start_z" default="0.0"/>
+  <arg name="goal_x" default="6.0"/>
+  <arg name="goal_y" default="0.0"/>
+  <arg name="goal_z" default="0.0"/>
   <arg name="robot_model_name" default="scout/"/>
   <arg name="goal_topic" default="/goal"/>
   <arg name="cmd_vel_topic" default="/cmd_vel"/>
@@ -14,6 +23,10 @@
   <arg name="reset_settle_s" default="3.0"/>
   <arg name="pre_goal_warmup_s" default="25.0"/>
   <arg name="hold_goal_clear_s" default="3.0"/>
+  <arg name="warmup_mode" default="stationary"/>
+  <arg name="warmup_cmd_sequence" default=""/>
+  <arg name="warmup_reset_to_start" default="false"/>
+  <arg name="warmup_end_requires_start" default="true"/>
   <arg name="path_grace_s" default="20.0"/>
   <arg name="risk_sample_radius_m" default="0.75"/>
   <arg name="enable_cmd_follower" default="true"/>
@@ -25,6 +38,15 @@
     <param name="config_path" value="$(arg config_path)"/>
     <param name="output_dir" value="$(arg output_dir)"/>
     <param name="method" value="$(arg method)"/>
+    <param name="scene" value="$(arg scene)"/>
+    <param name="task_id" value="$(arg task_id)"/>
+    <param name="runs" value="$(arg runs)"/>
+    <param name="start_x" value="$(arg start_x)"/>
+    <param name="start_y" value="$(arg start_y)"/>
+    <param name="start_z" value="$(arg start_z)"/>
+    <param name="goal_x" value="$(arg goal_x)"/>
+    <param name="goal_y" value="$(arg goal_y)"/>
+    <param name="goal_z" value="$(arg goal_z)"/>
     <param name="robot_model_name" value="$(arg robot_model_name)"/>
     <param name="goal_topic" value="$(arg goal_topic)"/>
     <param name="cmd_vel_topic" value="$(arg cmd_vel_topic)"/>
@@ -37,6 +59,10 @@
     <param name="reset_settle_s" value="$(arg reset_settle_s)"/>
     <param name="pre_goal_warmup_s" value="$(arg pre_goal_warmup_s)"/>
     <param name="hold_goal_clear_s" value="$(arg hold_goal_clear_s)"/>
+    <param name="warmup_mode" value="$(arg warmup_mode)"/>
+    <param name="warmup_cmd_sequence" value="$(arg warmup_cmd_sequence)"/>
+    <param name="warmup_reset_to_start" value="$(arg warmup_reset_to_start)"/>
+    <param name="warmup_end_requires_start" value="$(arg warmup_end_requires_start)"/>
     <param name="path_grace_s" value="$(arg path_grace_s)"/>
     <param name="risk_sample_radius_m" value="$(arg risk_sample_radius_m)"/>
     <param name="enable_cmd_follower" value="$(arg enable_cmd_follower)"/>
