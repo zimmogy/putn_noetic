@@ -1,0 +1,55 @@
+<launch>
+  <arg name="mode" default="prediction"/>
+  <arg name="model_path" default="/home/whr/Data/test_pt/proposed/epoch_best.pt"/>
+  <arg name="map_length_x" default="40.0"/>
+  <arg name="map_length_y" default="40.0"/>
+  <arg name="grid_resolution" default="0.1"/>
+  <arg name="launch_rviz" default="true"/>
+
+  <param name="use_sim_time" value="true"/>
+
+  <group if="$(eval arg('mode') == 'prediction')">
+    <node pkg="lesta" type="trav_prediction_node"
+          name="lesta_trav_prediction" output="screen" required="true">
+      <rosparam command="load" subst_value="true"
+                file="$(find lesta)/config/trav_prediction_node.yaml"/>
+      <rosparam command="load"
+                file="$(find lesta)/config/include/feature_extraction_params.yaml"/>
+      <param name="node/lidarscan_topic" value="/velodyne_points"/>
+      <param name="frame_id/robot_frame" value="base_link"/>
+      <param name="frame_id/map_frame" value="world"/>
+      <param name="height_mapper/frame_id" value="world"/>
+      <param name="height_mapper/map_length_x" value="15.0"/>
+      <param name="height_mapper/map_length_y" value="15.0"/>
+      <param name="height_mapper/grid_resolution" value="$(arg grid_resolution)"/>
+      <param name="traversability_network/model_path" value="$(arg model_path)"/>
+    </node>
+    <node pkg="grid_map_visualization" type="grid_map_visualization"
+          name="lesta_prediction_visualization" output="log">
+      <rosparam command="load"
+                file="$(find lesta)/config/include/feature_visualization.yaml"/>
+    </node>
+  </group>
+
+  <group if="$(eval arg('mode') == 'mapping')">
+    <node pkg="lesta" type="trav_mapping_node"
+          name="lesta_trav_mapping" output="screen" required="true">
+      <rosparam command="load" subst_value="true"
+                file="$(find lesta)/config/trav_mapping_node.yaml"/>
+      <rosparam command="load"
+                file="$(find lesta)/config/include/feature_extraction_params.yaml"/>
+      <param name="node/lidarscan_topic" value="/velodyne_points"/>
+      <param name="frame_id/robot_frame" value="base_link"/>
+      <param name="frame_id/map_frame" value="world"/>
+      <param name="height_mapper/frame_id" value="world"/>
+      <param name="height_mapper/map_length_x" value="$(arg map_length_x)"/>
+      <param name="height_mapper/map_length_y" value="$(arg map_length_y)"/>
+      <param name="height_mapper/grid_resolution" value="$(arg grid_resolution)"/>
+      <param name="traversability_mapper/model_path" value="$(arg model_path)"/>
+    </node>
+  </group>
+
+  <node if="$(arg launch_rviz)" pkg="rviz" type="rviz"
+        name="rviz_lesta_bag_test" output="log"
+        args="-d $(find putn_launch)/rviz_config/map1_wide_lesta_bag.rviz"/>
+</launch>

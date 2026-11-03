@@ -8,34 +8,43 @@ scout_motor_fr_controller:
   type: velocity_controllers/JointVelocityController
   joint: front_right_wheel
   pid:
-    p: 5.0
+    p: 100.0
     i: 20.0
     d: 0.0
-    i_clamp: 100.0
+    i_clamp: 200.0
 
 scout_motor_fl_controller:
   type: velocity_controllers/JointVelocityController
   joint: front_left_wheel
   pid:
-    p: 5.0
+    p: 100.0
     i: 20.0
     d: 0.0
-    i_clamp: 100.0
+    i_clamp: 200.0
 
 scout_motor_rl_controller:
   type: velocity_controllers/JointVelocityController
   joint: rear_left_wheel
   pid:
-    p: 5.0
+    p: 100.0
     i: 20.0
     d: 0.0
-    i_clamp: 100.0
+    i_clamp: 200.0
 
 scout_motor_rr_controller:
   type: velocity_controllers/JointVelocityController
   joint: rear_right_wheel
   pid:
-    p: 5.0
+    p: 100.0
     i: 20.0
     d: 0.0
-    i_clamp: 100.0
+    i_clamp: 200.0
+
+# DefaultRobotHWSim uses this namespace for VelocityJointInterface gains.
+# Controller-local gains above are not used by the Gazebo hardware adapter.
+gazebo_ros_control:
+  pid_gains:
+    front_right_wheel: {p: 100.0, i: 20.0, d: 0.0, i_clamp: 200.0}
+    front_left_wheel:  {p: 100.0, i: 20.0, d: 0.0, i_clamp: 200.0}
+    rear_left_wheel:   {p: 100.0, i: 20.0, d: 0.0, i_clamp: 200.0}
+    rear_right_wheel:  {p: 100.0, i: 20.0, d: 0.0, i_clamp: 200.0}

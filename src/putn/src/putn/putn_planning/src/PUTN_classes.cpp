@@ -7,6 +7,7 @@
 
 #include "PUTN_classes.h"
 
+#include <algorithm>
 #include <cmath>
 
 using namespace std;
@@ -154,8 +155,24 @@ Plane::Plane(const Eigen::Vector3d &p_surface,World* world,const double &radius,
         has_lesta_probability=true;
         lesta_traversable=traversable;
         const float lesta_risk=1.0f-probability;
-        traversability=lesta_arg.putn_weight*geometric_traversability+
-                       lesta_arg.lesta_weight*lesta_risk;
+        const float weighted_risk=
+            lesta_arg.putn_weight*geometric_traversability+
+            lesta_arg.lesta_weight*lesta_risk;
+        if(lesta_arg.fusion_policy=="risk_floor_weighted")
+        {
+            // A learned estimate may add risk, but must never erase a hazard
+            // already detected by PUTN geometry. This is especially important
+            // for zero-shot models whose confidence is not calibrated here.
+            traversability=std::max(geometric_traversability,weighted_risk);
+        }
+        else if(lesta_arg.fusion_policy=="conservative_max")
+        {
+            traversability=std::max(geometric_traversability,lesta_risk);
+        }
+        else
+        {
+            traversability=weighted_risk;
+        }
         if(traversability<0.0f) traversability=0.0f;
         if(traversability>1.0f) traversability=1.0f;
     }

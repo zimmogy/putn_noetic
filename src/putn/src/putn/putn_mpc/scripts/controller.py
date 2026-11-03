@@ -39,6 +39,10 @@ class Controller():
         self.time_sol = 0
         self.local_plan = np.zeros([self.N, 2])
         self.control_cmd = Twist()
+        self.manual_max_angular_speed = abs(float(
+            rospy.get_param('~manual_max_angular_speed', 2.0)))
+        self.manual_angular_step = abs(float(
+            rospy.get_param('~manual_angular_step', 0.2)))
         self.requested_mode = 'manual'
         self.current_mode = 'manual'
         self.publish_mode()
@@ -142,51 +146,45 @@ class Controller():
                 else:
                     data = data
             elif key == 'a':
-                if(data[1] < 0.6):
-                    data[1] += 0.2
-                else:
-                    data = data
+                data[1] = min(
+                    data[1] + self.manual_angular_step,
+                    self.manual_max_angular_speed)
             elif key == 'd':
-                if(data[1] > -0.6):
-                    data[1] -= 0.2
-                else:
-                    data = data
+                data[1] = max(
+                    data[1] - self.manual_angular_step,
+                    -self.manual_max_angular_speed)
             elif key == 'q':
                 if(data[0] < 0.6):
                     data[0] += 0.2
                 else:
                     data = data
-                if(data[1] < 0.6):
-                    data[1] += 0.2
-                else:
-                    data = data
+                data[1] = min(
+                    data[1] + self.manual_angular_step,
+                    self.manual_max_angular_speed)
             elif key == 'e':
                 if(data[0] < 0.6):
                     data[0] += 0.2
                 else:
                     data = data
-                if(data[1] > -0.6):
-                    data[1] -= 0.2
-                else:
-                    data = data
+                data[1] = max(
+                    data[1] - self.manual_angular_step,
+                    -self.manual_max_angular_speed)
             elif key == 'c':
                 if(data[0] > -0.6):
                     data[0] -= 0.2
                 else:
                     data = data
-                if(data[1] > -0.6):
-                    data[1] -= 0.2
-                else:
-                    data = data
+                data[1] = max(
+                    data[1] - self.manual_angular_step,
+                    -self.manual_max_angular_speed)
             elif key == 'z':
                 if(data[0] > -0.6):
                     data[0] -= 0.2
                 else:
                     data = data
-                if(data[1] < 0.6):
-                    data[1] += 0.2
-                else:
-                    data = data      
+                data[1] = min(
+                    data[1] + self.manual_angular_step,
+                    self.manual_max_angular_speed)
             elif key == 's':
                 data = np.array([0.0, 0.0])
             elif key == 'i':

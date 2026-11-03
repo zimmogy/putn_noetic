@@ -29,40 +29,45 @@ Reference:
         </plugin>
     </gazebo>
 
-    <!-- kp spring constant, kd damping constant -->
+    <!--
+      Skid steering needs high traction in the wheel rolling direction and
+      substantially lower lateral friction so the four tyres can scrub while
+      yawing.  The former mu1=mu2=10 setting locked lateral slip and made the
+      200 kg Scout resist rotation even when the wheel targets were correct.
+    -->
     <gazebo reference="front_left_wheel">
-        <mu1>10</mu1>
-        <mu2>10</mu2>
+        <mu1>2.0</mu1>
+        <mu2>0.20</mu2>
         <kp>10000000.0</kp>
         <kd>1.0</kd>
-        <minDepth>0.01</minDepth>
+        <minDepth>0.001</minDepth>
         <fdir1>1 0 0</fdir1>
         <maxContacts value="64"/>
     </gazebo>
     <gazebo reference="front_right_wheel">
-        <mu1>10</mu1>
-        <mu2>10</mu2>
+        <mu1>2.0</mu1>
+        <mu2>0.20</mu2>
         <kp>10000000.0</kp>
         <kd>1.0</kd>
-        <minDepth>0.01</minDepth>
+        <minDepth>0.001</minDepth>
         <fdir1>1 0 0</fdir1>
         <maxContacts value="64"/>
     </gazebo>
     <gazebo reference="rear_left_wheel">
-        <mu1>10</mu1>
-        <mu2>10</mu2>
+        <mu1>2.0</mu1>
+        <mu2>0.20</mu2>
         <kp>10000000.0</kp>
         <kd>1.0</kd>
-        <minDepth>0.01</minDepth>
+        <minDepth>0.001</minDepth>
         <fdir1>1 0 0</fdir1>
         <maxContacts value="64"/>
     </gazebo>
     <gazebo reference="rear_right_wheel">
-        <mu1>10</mu1>
-        <mu2>10</mu2>
+        <mu1>2.0</mu1>
+        <mu2>0.20</mu2>
         <kp>10000000.0</kp>
         <kd>1.0</kd>
-        <minDepth>0.01</minDepth>
+        <minDepth>0.001</minDepth>
         <fdir1>1 0 0</fdir1>
         <maxContacts value="64"/>
     </gazebo>

@@ -85,15 +85,15 @@ The workspace also keeps a dedicated synthetic test map:
 
 The evaluator can run one start-goal pair at a time. Change `scene`, `start_*`, and `goal_*` from the launch command line to test different cases on `map1` or `map2`.
 
-For repeatable simulation tests, `map_test_nav_eval_with_sim.launch` uses a fixed warmup sequence by default:
+For repeatable `map1_wide` tests, `map_test_nav_eval_with_sim.launch` uses staged coverage warmup by default:
 
-1. Put the robot at the configured `start_*` position with Gazebo.
-2. Execute a deterministic `cmd_vel` warmup sequence to collect enough local map and traversability information.
-3. Keep SLAM/odometry continuous; do not teleport the robot back after warmup by default.
-4. Check whether the warmup ended within `start_tolerance_m` of the configured `start_*`.
-5. Clear evaluator-only statistics, publish `goal_*`, then start timing and recording.
+1. Leave the LiDAR blind spot with the short configured bootstrap motion.
+2. Navigate through the interpolated O-B-C-D-A-O coverage waypoints without teleporting, so PF-RRT* receives locally projectable goals while the map is populated.
+3. Navigate to each requested episode start and verify it with Gazebo ground truth.
+4. Require fresh pose/TF/LESTA data, a stable upright chassis, and a bounded TF/Gazebo offset before starting the formal sample.
+5. Publish the formal goal and record navigation, terrain-exposure, drift, and cross-session cumulative metrics.
 
-This avoids SLAM discontinuities caused by teleporting after warmup. If the fixed warmup motion does not naturally return the robot near the configured start, the episode is marked as `warmup_not_at_start` instead of continuing with an invalid start state.
+This avoids SLAM discontinuities caused by teleporting after warmup. An unhealthy episode boundary is excluded from the navigation success rate, saved to the campaign checkpoint, and ends the current launch so the same command can restart the simulator, re-warm the map, and fill only the missing eligible samples.
 
 Single-case test arguments:
 
@@ -104,14 +104,61 @@ Single-case test arguments:
 - `start_x`, `start_y`, `start_z`: robot start position in the `world` frame.
 - `spawn_z_offset`: only used by `map_test_nav_eval_with_sim.launch`; Gazebo spawns the robot at `start_z + spawn_z_offset`, default `1.0`, to avoid dropping the URDF into the ground.
 - `spawn_yaw`: initial Gazebo yaw angle for the Scout model, default `0.0`.
+- `simulation_spawn_x`, `simulation_spawn_y`, `simulation_spawn_z`: optional
+  cold-start pose for the combined simulation launch. They default to the
+  formal `start_*` values. For a non-O test, set them to O so coverage warmup
+  starts on the route it was designed for; the evaluator then navigates to the
+  formal start without teleporting.
 - `goal_x`, `goal_y`, `goal_z`: navigation goal position in the `world` frame.
-- `runs`: repeat count for this single start-goal pair. Use `1` for quick checks.
+- `runs`: eligible-sample quota per direction. With `bidirectional:=true`, `runs:=10` requests 10 O-to-A and 10 A-to-O samples; failed formal navigation samples remain in the quota.
 - `lesta_model_path`: required when `use_lesta:=true`; pass a valid TorchScript/LibTorch `.pt` model.
-- `start_mode`: robot placement mode before each run. For simulation fixed-start tests, use the default `gazebo`.
-- `warmup_mode`: default `fixed_motion` in `map_test_nav_eval_with_sim.launch`; use `stationary` for old static warmup or `none` to disable warmup.
+- `start_mode`: defaults to `navigate`; Gazebo teleport is intentionally avoided because it desynchronizes A-LOAM.
+- `warmup_mode`: defaults to `coverage_waypoints` in `map_test_nav_eval_with_sim.launch`; use `fixed_motion`, `stationary`, or `none` only for targeted diagnostics.
 - `warmup_cmd_sequence`: semicolon-separated `linear_x,angular_z,duration_s` phases. The combined launch defaults to an enlarged near-square warmup loop, about four 1.4 m sides: `0.18,0.00,8.0;0.00,0.45,3.49;...`.
 - `warmup_reset_to_start`: default `false`; keep this disabled for SLAM-continuous tests. Setting it to `true` teleports the robot back with Gazebo and may break A-LOAM/SLAM consistency.
 - `warmup_end_requires_start`: default `true`; require warmup to end near the configured start before the formal goal is published.
+- `pre_episode_max_tf_gazebo_offset_m`: generic default `4.0`; the combined simulation/evaluation launch uses `2.5` for isolated tests. Request a full restart instead of starting a sample when boundary drift exceeds this value. Set `0` to disable only this boundary check.
+- `max_consecutive_planning_failures_before_restart`: default `2`; checkpoint and restart after repeated `no_path`, `stuck`, or frame-divergence failures instead of continuing in a potentially degraded session.
+- `max_episode_attempts_per_session`: generic default `0` (continuous/endurance mode); `map_test_nav_eval_with_sim.launch` defaults to `1`, so one fully warmed simulator session contributes only one formal attempt before checkpointing and exiting.
+
+The episode CSV now includes `campaign_session_id`, session/campaign active time and travelled distance, elevation gain/loss, and time-weighted TF/Gazebo drift mean/RMS. It also records final/failure Gazebo XYZ and attitude plus the position, attitude, elapsed time, and travelled distance of the maximum-tilt sample. These fields distinguish repeated failures on one terrain patch from cumulative session drift. Summary rows include first-half versus second-half failure rates and separate `session:<id>` groups, which makes cumulative-time hypotheses testable without confusing samples from different simulator restarts.
+
+The dedicated `fusion_simulation.launch` and `map_test_nav_eval_with_sim.launch`
+entry points default to `lesta_putn_weight:=0.75 lesta_weight:=0.25`. This is the
+conservative zero-shot setting for the RELLIS-3D-trained checkpoint in Gazebo;
+the generic `simulation.launch` defaults are unchanged. Always encode the weight
+setting in a new `campaign_id` so samples from different fusion policies cannot
+be mixed.
+
+Run the PUTN-only A-C baseline as 10 isolated eligible samples in each
+direction. The wrapper restarts the full simulator and repeats coverage warmup
+after every formal attempt, while the evaluator balances which direction is
+first. Keep this campaign separate from continuous/endurance data:
+
+```bash
+python3 /home/whr/putn_noetic/src/putn/src/putn/putn_launch/scripts/run_isolated_nav_campaign.py \
+  --checkpoint /home/whr/.ros/putn_nav_eval/map_test_nav_success_rate_putn_ac_isolated_v1_180s_10_campaign_checkpoint.json \
+  --max-sessions 25 --restart-delay-s 5 -- \
+  putn_launch map_test_nav_eval_with_sim.launch \
+  scene:=map1_wide \
+  use_lesta:=false method:=putn_baseline \
+  task_id:=map1_wide_ac_putn \
+  simulation_spawn_x:=0.0 simulation_spawn_y:=0.0 simulation_spawn_z:=0.0 \
+  start_x:=8.4 start_y:=7.7 start_z:=0.0 start_label:=A \
+  goal_x:=-8.5 goal_y:=-8.3 goal_z:=0.0 goal_label:=C \
+  bidirectional:=true runs:=10 \
+  navigation_timeout_s:=180.0 \
+  warmup_total_timeout_s:=900.0 \
+  session_direction_order_policy:=balanced \
+  max_episode_attempts_per_session:=1 \
+  pre_episode_max_tf_gazebo_offset_m:=2.5 \
+  campaign_id:=putn_ac_isolated_v1_180s_10
+```
+
+Pressing Ctrl-C stops the wrapper without deleting the atomic checkpoint. Run
+the same command again to resume. For a separate endurance campaign, launch
+roslaunch directly with `max_episode_attempts_per_session:=0` and a different
+`campaign_id`.
 
 Run simulation and evaluation together on `map1`:
 

@@ -44,7 +44,7 @@ Visualization Manager:
       Autocompute Value Bounds:
         Max Value: 3.282770872116089
         Min Value: -1.5172291994094849
-        Value: true
+        Value: false
       Axis: Z
       Channel Name: intensity
       Class: rviz/PointCloud2

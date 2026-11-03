@@ -1,0 +1,39 @@
+<launch>
+  <!--
+    Collect a manually driven, model-independent map1_wide dataset.
+
+    This launch never publishes motion commands. Drive the robot by publishing
+    geometry_msgs/Twist on /cmd_vel from a separate keyboard/joystick terminal.
+    LeSTA is deliberately disabled while collecting so that a deployed model
+    cannot bias which terrain enters its own future dataset.
+  -->
+  <arg name="bag_prefix" default="$(env HOME)/.ros/map1_wide_lesta_raw"/>
+  <arg name="split_size_mb" default="4096"/>
+  <arg name="buffsize_mb" default="1024"/>
+  <arg name="start_x" default="0.0"/>
+  <arg name="start_y" default="0.0"/>
+  <arg name="start_z" default="0.0"/>
+  <arg name="spawn_z_offset" default="1.0"/>
+  <arg name="spawn_yaw" default="0.0"/>
+  <arg name="launch_rviz" default="true"/>
+
+  <include file="$(find putn_launch)/launch/simulation.launch">
+    <arg name="scene" value="map1_wide"/>
+    <arg name="use_lesta" value="false"/>
+    <arg name="spawn_x" value="$(arg start_x)"/>
+    <arg name="spawn_y" value="$(arg start_y)"/>
+    <arg name="spawn_z" value="$(eval float(arg('start_z')) + float(arg('spawn_z_offset')))"/>
+    <arg name="spawn_yaw" value="$(arg spawn_yaw)"/>
+    <arg name="launch_rviz" value="$(arg launch_rviz)"/>
+    <arg name="launch_local_control" value="false"/>
+  </include>
+
+  <!--
+    Raw/replay-critical topics plus ground truth and commands.  Avoid -a here:
+    LeSTA/grid-map and Gazebo debug topics make bags much larger and are
+    reproducible from these inputs.
+  -->
+  <node pkg="rosbag" type="record" name="map1_wide_bag_recorder"
+        output="screen" required="false"
+        args="--lz4 --split --size=$(arg split_size_mb) --buffsize=$(arg buffsize_mb) -o $(arg bag_prefix) /velodyne_points /tf /tf_static /clock /gazebo/model_states /odom /joint_states /cmd_vel /laser_odom_to_init /aft_mapped_to_init /laser_cloud_map /laser_cloud_surround /global_planning_node/global_path /waypoint_generator/waypoints"/>
+</launch>

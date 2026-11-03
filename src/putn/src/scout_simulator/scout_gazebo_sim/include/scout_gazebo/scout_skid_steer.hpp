@@ -30,7 +30,9 @@ class ScoutSkidSteer {
   std::string motor_rr_topic_;
   std::string cmd_topic_;
 
-  const double SCOUT_WHEELBASE = 0.498;
+  // Differential-drive yaw kinematics use half the lateral wheel track, not
+  // the longitudinal wheelbase.
+  const double SCOUT_HALF_TRACK = 0.58306 / 2.0;
   const double SCOUT_WHEEL_RADIUS = 0.16459;
 
   ros::NodeHandle *nh_;

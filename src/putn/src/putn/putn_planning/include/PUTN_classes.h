@@ -108,6 +108,7 @@ struct LeSTATraversabilityArg
     float lesta_weight=0.7f;
     float unknown_penalty=0.0f;
     float risk_threshold=0.75f;
+    std::string fusion_policy="legacy_weighted_sum";
     std::string probability_layer="traversability/probability";
     std::string binary_layer="traversability/binary";
 };

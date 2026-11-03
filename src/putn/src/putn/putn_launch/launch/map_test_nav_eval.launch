@@ -1,24 +1,42 @@
 <launch>
   <arg name="config_path" default="$(find putn_launch)/config/map_test_nav_eval.yaml"/>
   <arg name="output_dir" default="$(env HOME)/.ros/putn_nav_eval"/>
-  <arg name="method" default="lesta_putn"/>
+  <arg name="method" default="auto"/>
+  <arg name="use_lesta" default="false"/>
+  <arg name="lesta_model_path" default=""/>
+  <arg name="lesta_putn_weight" default="0.3"/>
+  <arg name="lesta_weight" default="0.7"/>
+  <arg name="lesta_unknown_penalty" default="0.0"/>
+  <arg name="lesta_risk_threshold" default="0.75"/>
+  <arg name="lesta_fusion_policy" default="legacy_weighted_sum"/>
+  <arg name="lesta_map_source" default="prediction"/>
+  <arg name="require_lesta_ready" default="true"/>
+  <arg name="lesta_readiness_timeout_s" default="30.0"/>
+  <arg name="lesta_map_topic" default="/lesta/prediction/traversability"/>
+  <arg name="lesta_probability_layer" default="traversability/probability"/>
+  <arg name="lesta_binary_layer" default="traversability/binary"/>
   <arg name="scene" default="map1"/>
+  <arg name="warmup_coordinate_scale" default="1.0"/>
   <arg name="task_id" default="single_start_goal"/>
   <arg name="runs" default="1"/>
   <arg name="start_x" default="0.0"/>
   <arg name="start_y" default="0.0"/>
   <arg name="start_z" default="0.0"/>
+  <arg name="start_label" default="start"/>
   <arg name="goal_x" default="6.0"/>
   <arg name="goal_y" default="0.0"/>
   <arg name="goal_z" default="0.0"/>
+  <arg name="goal_label" default="goal"/>
   <arg name="robot_model_name" default="scout/"/>
   <arg name="goal_topic" default="/goal"/>
   <arg name="cmd_vel_topic" default="/cmd_vel"/>
+  <arg name="require_exclusive_cmd_vel" default="true"/>
   <arg name="model_states_topic" default="/gazebo/model_states"/>
   <arg name="global_path_topic" default="/global_planning_node/global_path"/>
   <arg name="fused_cloud_topic" default="/global_planning_node/fused_traversability_cloud"/>
   <arg name="start_mode" default="navigate"/>
   <arg name="reposition_timeout_s" default="180.0"/>
+  <arg name="navigation_timeout_s" default="180.0"/>
   <arg name="start_tolerance_m" default="0.6"/>
   <arg name="reset_settle_s" default="3.0"/>
   <arg name="pre_goal_warmup_s" default="25.0"/>
@@ -27,34 +45,152 @@
   <arg name="warmup_cmd_sequence" default=""/>
   <arg name="warmup_reset_to_start" default="false"/>
   <arg name="warmup_end_requires_start" default="true"/>
+  <arg name="warmup_once" default="true"/>
+  <arg name="warmup_bootstrap_enabled" default="true"/>
+  <arg name="warmup_bootstrap_min_displacement_m" default="0.08"/>
+  <arg name="projection_recovery_distances_m" default="0.35,-0.55,0.75,-0.95"/>
+  <arg name="projection_recovery_speed_mps" default="0.12"/>
+  <arg name="projection_recovery_map_settle_s" default="3.0"/>
+  <arg name="projection_recovery_scan_angle_deg" default="35.0"/>
+  <arg name="bidirectional" default="true"/>
+  <!-- Balance which direction is first after a full restart, so direction is
+       not confounded with warmup/accumulated localization exposure. -->
+  <arg name="session_direction_order_policy" default="balanced"/>
+  <!-- 0: continuous/endurance mode; 1: one warmed episode attempt per launch. -->
+  <arg name="max_episode_attempts_per_session" default="0"/>
+  <arg name="rrt_settle_s" default="8.0"/>
+  <arg name="warmup_waypoint_spacing_m" default="2.0"/>
+  <arg name="warmup_waypoint_tolerance_m" default="0.8"/>
+  <arg name="warmup_waypoint_timeout_s" default="60.0"/>
+  <arg name="warmup_waypoint_retries" default="1"/>
+  <arg name="warmup_no_progress_timeout_s" default="12.0"/>
+  <arg name="warmup_min_progress_m" default="0.15"/>
+  <arg name="warmup_path_stale_s" default="3.0"/>
+  <arg name="warmup_total_timeout_s" default="720.0"/>
+  <arg name="warmup_target_coverage_ratio" default="0.90"/>
+  <arg name="warmup_safety_margin_m" default="0.8"/>
   <arg name="path_grace_s" default="20.0"/>
+  <!-- PUTN/PF-RRT* start projection recovery. Angles are relative and alternate direction. -->
+  <arg name="enable_heading_recovery" default="true"/>
+  <arg name="heading_recovery_trigger_s" default="12.0"/>
+  <arg name="heading_recovery_angles_deg" default="35,-70,105,-140"/>
+  <arg name="heading_recovery_speed" default="2.0"/>
+  <arg name="heading_recovery_tolerance_deg" default="3.0"/>
+  <arg name="heading_recovery_rotation_timeout_s" default="12.0"/>
+  <arg name="heading_recovery_settle_s" default="2.0"/>
   <arg name="risk_sample_radius_m" default="0.75"/>
   <arg name="enable_cmd_follower" default="true"/>
+  <arg name="lookahead_distance_m" default="0.70"/>
+  <arg name="path_switch_min_interval_s" default="1.5"/>
+  <arg name="path_max_hold_s" default="3.0"/>
+  <arg name="path_switch_max_heading_deg" default="55.0"/>
+  <arg name="active_path_end_distance_m" default="0.60"/>
+  <arg name="active_path_max_cross_track_m" default="0.80"/>
+  <arg name="path_origin_max_error_m" default="2.0"/>
+  <!-- Follow PF-RRT* paths with the same /world -> /base_link TF used by PUTN.
+       Gazebo pose remains the independent ground truth for metrics. -->
+  <arg name="control_pose_source" default="tf"/>
+  <arg name="localization_drift_fail_m" default="1.0"/>
+  <arg name="localization_drift_hold_s" default="2.0"/>
+  <!-- Excluded setup/localization records are retried until the eligible quota is full. -->
+  <arg name="abort_on_start_setup_failure" default="false"/>
+  <arg name="max_excluded_retries_per_direction" default="10"/>
+  <!-- Persist incomplete sample quotas across full simulator restarts. -->
+  <arg name="resume_incomplete_campaign" default="true"/>
+  <arg name="campaign_id" default=""/>
+  <!-- Optional one-time import of a partial episodes CSV created before checkpoints existed. -->
+  <arg name="campaign_seed_csv" default=""/>
+  <!-- Optional benchmark isolation: keep goals fixed in Gazebo physical space,
+       then map them into PUTN world using the current TF/Gazebo SE(2) offset. -->
+  <arg name="compensate_goals_with_ground_truth" default="false"/>
+  <arg name="abort_on_localization_drift" default="true"/>
+  <arg name="abort_session_on_severe_localization_drift" default="true"/>
+  <arg name="severe_localization_drift_fail_m" default="4.0"/>
+  <arg name="severe_localization_drift_hold_s" default="3.0"/>
+  <!-- Failure decisions use persistence and Gazebo physical progress, not a
+       single noisy pose/speed sample. -->
+  <arg name="tilt_fail_hold_s" default="0.8"/>
+  <arg name="severe_tilt_fail_deg" default="50.0"/>
+  <arg name="goal_compensation_refresh_distance_m" default="0.60"/>
+  <!-- Kept for diagnostics/backward compatibility; yaw alone no longer refreshes a point goal. -->
+  <arg name="goal_compensation_refresh_yaw_deg" default="3.0"/>
+  <arg name="goal_compensation_refresh_min_interval_s" default="8.0"/>
+  <arg name="goal_compensation_max_refreshes" default="12"/>
+  <arg name="goal_compensation_max_forced_refreshes" default="3"/>
+  <arg name="goal_compensation_forced_min_progress_m" default="0.15"/>
+  <arg name="control_goal_tolerance_m" default="0.30"/>
+  <arg name="control_goal_mismatch_physical_error_m" default="1.0"/>
+  <arg name="control_goal_mismatch_hold_s" default="2.0"/>
+  <arg name="physical_stuck_displacement_m" default="0.12"/>
+  <arg name="physical_stuck_hold_s" default="12.0"/>
+  <arg name="physical_stuck_max_recoveries" default="2"/>
+  <!-- Between-episode session health guard. A failed guard is excluded from
+       navigation success rate and requests a full simulator restart/resume. -->
+  <arg name="pre_episode_health_timeout_s" default="8.0"/>
+  <arg name="pre_episode_health_hold_s" default="1.0"/>
+  <arg name="pre_episode_max_tilt_deg" default="25.0"/>
+  <arg name="pre_episode_max_tf_gazebo_offset_m" default="4.0"/>
+  <arg name="pre_episode_max_sensor_age_s" default="2.0"/>
+  <arg name="post_episode_health_check" default="true"/>
+  <arg name="lesta_map_max_age_s" default="5.0"/>
+  <arg name="max_consecutive_planning_failures_before_restart" default="2"/>
+  <arg name="runtime_metric_sample_period_s" default="0.10"/>
+  <arg name="runtime_metric_max_step_m" default="1.0"/>
   <arg name="max_linear_speed" default="0.45"/>
-  <arg name="max_angular_speed" default="0.8"/>
+  <arg name="max_angular_speed" default="2.0"/>
+  <arg name="allow_reverse_following" default="false"/>
+  <arg name="reverse_heading_threshold_deg" default="100.0"/>
+  <arg name="reverse_exit_threshold_deg" default="85.0"/>
+  <arg name="min_follow_linear_speed" default="0.10"/>
+  <arg name="min_follow_angular_speed" default="0.20"/>
+  <arg name="min_turn_in_place_angular_speed" default="2.0"/>
+  <arg name="rotate_in_place_threshold_deg" default="55.0"/>
+  <arg name="rotate_in_place_exit_threshold_deg" default="20.0"/>
+  <arg name="max_moving_angular_speed" default="0.55"/>
   <arg name="initial_delay_s" default="0.0"/>
+  <!-- Stop the complete roslaunch tree when the evaluator finishes or aborts. -->
+  <arg name="shutdown_on_completion" default="true"/>
 
-  <node pkg="putn_launch" type="run_map_test_nav_eval.py" name="map_test_nav_eval" output="screen">
+  <node pkg="putn_launch" type="run_map_test_nav_eval.py" name="map_test_nav_eval"
+        output="screen" required="$(arg shutdown_on_completion)">
     <param name="config_path" value="$(arg config_path)"/>
     <param name="output_dir" value="$(arg output_dir)"/>
     <param name="method" value="$(arg method)"/>
+    <param name="use_lesta" value="$(arg use_lesta)"/>
+    <param name="lesta_model_path" value="$(arg lesta_model_path)"/>
+    <param name="lesta_putn_weight" value="$(arg lesta_putn_weight)"/>
+    <param name="lesta_weight" value="$(arg lesta_weight)"/>
+    <param name="lesta_unknown_penalty" value="$(arg lesta_unknown_penalty)"/>
+    <param name="lesta_risk_threshold" value="$(arg lesta_risk_threshold)"/>
+    <param name="lesta_fusion_policy" value="$(arg lesta_fusion_policy)"/>
+    <param name="lesta_map_source" value="$(arg lesta_map_source)"/>
+    <param name="require_lesta_ready" value="$(arg require_lesta_ready)"/>
+    <param name="lesta_readiness_timeout_s" value="$(arg lesta_readiness_timeout_s)"/>
+    <param name="lesta_map_topic" value="$(arg lesta_map_topic)"/>
+    <param name="lesta_probability_layer" value="$(arg lesta_probability_layer)"/>
+    <param name="lesta_binary_layer" value="$(arg lesta_binary_layer)"/>
     <param name="scene" value="$(arg scene)"/>
+    <param name="warmup_coordinate_scale" value="$(arg warmup_coordinate_scale)"/>
     <param name="task_id" value="$(arg task_id)"/>
     <param name="runs" value="$(arg runs)"/>
     <param name="start_x" value="$(arg start_x)"/>
     <param name="start_y" value="$(arg start_y)"/>
     <param name="start_z" value="$(arg start_z)"/>
+    <param name="start_label" value="$(arg start_label)"/>
     <param name="goal_x" value="$(arg goal_x)"/>
     <param name="goal_y" value="$(arg goal_y)"/>
     <param name="goal_z" value="$(arg goal_z)"/>
+    <param name="goal_label" value="$(arg goal_label)"/>
     <param name="robot_model_name" value="$(arg robot_model_name)"/>
     <param name="goal_topic" value="$(arg goal_topic)"/>
     <param name="cmd_vel_topic" value="$(arg cmd_vel_topic)"/>
+    <param name="require_exclusive_cmd_vel" value="$(arg require_exclusive_cmd_vel)"/>
     <param name="model_states_topic" value="$(arg model_states_topic)"/>
     <param name="global_path_topic" value="$(arg global_path_topic)"/>
     <param name="fused_cloud_topic" value="$(arg fused_cloud_topic)"/>
     <param name="start_mode" value="$(arg start_mode)"/>
     <param name="reposition_timeout_s" value="$(arg reposition_timeout_s)"/>
+    <param name="navigation_timeout_s" value="$(arg navigation_timeout_s)"/>
     <param name="start_tolerance_m" value="$(arg start_tolerance_m)"/>
     <param name="reset_settle_s" value="$(arg reset_settle_s)"/>
     <param name="pre_goal_warmup_s" value="$(arg pre_goal_warmup_s)"/>
@@ -63,11 +199,92 @@
     <param name="warmup_cmd_sequence" value="$(arg warmup_cmd_sequence)"/>
     <param name="warmup_reset_to_start" value="$(arg warmup_reset_to_start)"/>
     <param name="warmup_end_requires_start" value="$(arg warmup_end_requires_start)"/>
+    <param name="warmup_once" value="$(arg warmup_once)"/>
+    <param name="warmup_bootstrap_enabled" value="$(arg warmup_bootstrap_enabled)"/>
+    <param name="warmup_bootstrap_min_displacement_m" value="$(arg warmup_bootstrap_min_displacement_m)"/>
+    <param name="projection_recovery_distances_m" value="$(arg projection_recovery_distances_m)"/>
+    <param name="projection_recovery_speed_mps" value="$(arg projection_recovery_speed_mps)"/>
+    <param name="projection_recovery_map_settle_s" value="$(arg projection_recovery_map_settle_s)"/>
+    <param name="projection_recovery_scan_angle_deg" value="$(arg projection_recovery_scan_angle_deg)"/>
+    <param name="bidirectional" value="$(arg bidirectional)"/>
+    <param name="session_direction_order_policy" value="$(arg session_direction_order_policy)"/>
+    <param name="max_episode_attempts_per_session" value="$(arg max_episode_attempts_per_session)"/>
+    <param name="rrt_settle_s" value="$(arg rrt_settle_s)"/>
+    <param name="warmup_waypoint_spacing_m" value="$(arg warmup_waypoint_spacing_m)"/>
+    <param name="warmup_waypoint_tolerance_m" value="$(arg warmup_waypoint_tolerance_m)"/>
+    <param name="warmup_waypoint_timeout_s" value="$(arg warmup_waypoint_timeout_s)"/>
+    <param name="warmup_waypoint_retries" value="$(arg warmup_waypoint_retries)"/>
+    <param name="warmup_no_progress_timeout_s" value="$(arg warmup_no_progress_timeout_s)"/>
+    <param name="warmup_min_progress_m" value="$(arg warmup_min_progress_m)"/>
+    <param name="warmup_path_stale_s" value="$(arg warmup_path_stale_s)"/>
+    <param name="warmup_total_timeout_s" value="$(arg warmup_total_timeout_s)"/>
+    <param name="warmup_target_coverage_ratio" value="$(arg warmup_target_coverage_ratio)"/>
+    <param name="warmup_safety_margin_m" value="$(arg warmup_safety_margin_m)"/>
     <param name="path_grace_s" value="$(arg path_grace_s)"/>
+    <param name="enable_heading_recovery" value="$(arg enable_heading_recovery)"/>
+    <param name="heading_recovery_trigger_s" value="$(arg heading_recovery_trigger_s)"/>
+    <param name="heading_recovery_angles_deg" value="$(arg heading_recovery_angles_deg)"/>
+    <param name="heading_recovery_speed" value="$(arg heading_recovery_speed)"/>
+    <param name="heading_recovery_tolerance_deg" value="$(arg heading_recovery_tolerance_deg)"/>
+    <param name="heading_recovery_rotation_timeout_s" value="$(arg heading_recovery_rotation_timeout_s)"/>
+    <param name="heading_recovery_settle_s" value="$(arg heading_recovery_settle_s)"/>
     <param name="risk_sample_radius_m" value="$(arg risk_sample_radius_m)"/>
     <param name="enable_cmd_follower" value="$(arg enable_cmd_follower)"/>
+    <param name="lookahead_distance_m" value="$(arg lookahead_distance_m)"/>
+    <param name="path_switch_min_interval_s" value="$(arg path_switch_min_interval_s)"/>
+    <param name="path_max_hold_s" value="$(arg path_max_hold_s)"/>
+    <param name="path_switch_max_heading_deg" value="$(arg path_switch_max_heading_deg)"/>
+    <param name="active_path_end_distance_m" value="$(arg active_path_end_distance_m)"/>
+    <param name="active_path_max_cross_track_m" value="$(arg active_path_max_cross_track_m)"/>
+    <param name="path_origin_max_error_m" value="$(arg path_origin_max_error_m)"/>
+    <param name="control_pose_source" value="$(arg control_pose_source)"/>
+    <param name="localization_drift_fail_m" value="$(arg localization_drift_fail_m)"/>
+    <param name="localization_drift_hold_s" value="$(arg localization_drift_hold_s)"/>
+    <param name="abort_on_start_setup_failure" value="$(arg abort_on_start_setup_failure)"/>
+    <param name="max_excluded_retries_per_direction" value="$(arg max_excluded_retries_per_direction)"/>
+    <param name="resume_incomplete_campaign" value="$(arg resume_incomplete_campaign)"/>
+    <param name="campaign_id" value="$(arg campaign_id)"/>
+    <param name="campaign_seed_csv" value="$(arg campaign_seed_csv)"/>
+    <param name="compensate_goals_with_ground_truth" value="$(arg compensate_goals_with_ground_truth)"/>
+    <param name="abort_on_localization_drift" value="$(arg abort_on_localization_drift)"/>
+    <param name="abort_session_on_severe_localization_drift" value="$(arg abort_session_on_severe_localization_drift)"/>
+    <param name="severe_localization_drift_fail_m" value="$(arg severe_localization_drift_fail_m)"/>
+    <param name="severe_localization_drift_hold_s" value="$(arg severe_localization_drift_hold_s)"/>
+    <param name="tilt_fail_hold_s" value="$(arg tilt_fail_hold_s)"/>
+    <param name="severe_tilt_fail_deg" value="$(arg severe_tilt_fail_deg)"/>
+    <param name="goal_compensation_refresh_distance_m" value="$(arg goal_compensation_refresh_distance_m)"/>
+    <param name="goal_compensation_refresh_yaw_deg" value="$(arg goal_compensation_refresh_yaw_deg)"/>
+    <param name="goal_compensation_refresh_min_interval_s" value="$(arg goal_compensation_refresh_min_interval_s)"/>
+    <param name="goal_compensation_max_refreshes" value="$(arg goal_compensation_max_refreshes)"/>
+    <param name="goal_compensation_max_forced_refreshes" value="$(arg goal_compensation_max_forced_refreshes)"/>
+    <param name="goal_compensation_forced_min_progress_m" value="$(arg goal_compensation_forced_min_progress_m)"/>
+    <param name="control_goal_tolerance_m" value="$(arg control_goal_tolerance_m)"/>
+    <param name="control_goal_mismatch_physical_error_m" value="$(arg control_goal_mismatch_physical_error_m)"/>
+    <param name="control_goal_mismatch_hold_s" value="$(arg control_goal_mismatch_hold_s)"/>
+    <param name="physical_stuck_displacement_m" value="$(arg physical_stuck_displacement_m)"/>
+    <param name="physical_stuck_hold_s" value="$(arg physical_stuck_hold_s)"/>
+    <param name="physical_stuck_max_recoveries" value="$(arg physical_stuck_max_recoveries)"/>
+    <param name="pre_episode_health_timeout_s" value="$(arg pre_episode_health_timeout_s)"/>
+    <param name="pre_episode_health_hold_s" value="$(arg pre_episode_health_hold_s)"/>
+    <param name="pre_episode_max_tilt_deg" value="$(arg pre_episode_max_tilt_deg)"/>
+    <param name="pre_episode_max_tf_gazebo_offset_m" value="$(arg pre_episode_max_tf_gazebo_offset_m)"/>
+    <param name="pre_episode_max_sensor_age_s" value="$(arg pre_episode_max_sensor_age_s)"/>
+    <param name="post_episode_health_check" value="$(arg post_episode_health_check)"/>
+    <param name="lesta_map_max_age_s" value="$(arg lesta_map_max_age_s)"/>
+    <param name="max_consecutive_planning_failures_before_restart" value="$(arg max_consecutive_planning_failures_before_restart)"/>
+    <param name="runtime_metric_sample_period_s" value="$(arg runtime_metric_sample_period_s)"/>
+    <param name="runtime_metric_max_step_m" value="$(arg runtime_metric_max_step_m)"/>
     <param name="max_linear_speed" value="$(arg max_linear_speed)"/>
     <param name="max_angular_speed" value="$(arg max_angular_speed)"/>
+    <param name="allow_reverse_following" value="$(arg allow_reverse_following)"/>
+    <param name="reverse_heading_threshold_deg" value="$(arg reverse_heading_threshold_deg)"/>
+    <param name="reverse_exit_threshold_deg" value="$(arg reverse_exit_threshold_deg)"/>
+    <param name="min_follow_linear_speed" value="$(arg min_follow_linear_speed)"/>
+    <param name="min_follow_angular_speed" value="$(arg min_follow_angular_speed)"/>
+    <param name="min_turn_in_place_angular_speed" value="$(arg min_turn_in_place_angular_speed)"/>
+    <param name="rotate_in_place_threshold_deg" value="$(arg rotate_in_place_threshold_deg)"/>
+    <param name="rotate_in_place_exit_threshold_deg" value="$(arg rotate_in_place_exit_threshold_deg)"/>
+    <param name="max_moving_angular_speed" value="$(arg max_moving_angular_speed)"/>
     <param name="initial_delay_s" value="$(arg initial_delay_s)"/>
   </node>
 </launch>

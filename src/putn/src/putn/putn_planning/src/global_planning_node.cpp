@@ -287,12 +287,27 @@ int main(int argc, char** argv)
   nh.param("planning/lesta_weight", lesta_traversability_arg.lesta_weight, 0.7f);
   nh.param("planning/lesta_unknown_penalty", lesta_traversability_arg.unknown_penalty, 0.0f);
   nh.param("planning/lesta_risk_threshold", lesta_traversability_arg.risk_threshold, 0.75f);
+  nh.param("planning/lesta_fusion_policy",
+           lesta_traversability_arg.fusion_policy,
+           std::string("legacy_weighted_sum"));
+  if(lesta_traversability_arg.fusion_policy!="legacy_weighted_sum" &&
+     lesta_traversability_arg.fusion_policy!="risk_floor_weighted" &&
+     lesta_traversability_arg.fusion_policy!="conservative_max")
+  {
+    ROS_WARN("Unknown LeSTA fusion policy '%s'; using legacy_weighted_sum",
+             lesta_traversability_arg.fusion_policy.c_str());
+    lesta_traversability_arg.fusion_policy="legacy_weighted_sum";
+  }
   nh.param("planning/lesta_probability_layer",
            lesta_traversability_arg.probability_layer,
            std::string("traversability/probability"));
   nh.param("planning/lesta_binary_layer",
            lesta_traversability_arg.binary_layer,
            std::string("traversability/binary"));
+  ROS_INFO("LeSTA fusion policy=%s probability_layer=%s binary_layer=%s",
+           lesta_traversability_arg.fusion_policy.c_str(),
+           lesta_traversability_arg.probability_layer.c_str(),
+           lesta_traversability_arg.binary_layer.c_str());
 
   nh.param("planning/max_initial_time", max_initial_time, 1000.0);
 

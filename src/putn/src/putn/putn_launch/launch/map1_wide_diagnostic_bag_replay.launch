@@ -1,0 +1,27 @@
+<launch>
+  <!-- Replay recorded point clouds, LeSTA maps, fused risk and ground truth.
+       Playback starts paused so RViz and TF consumers are ready before data moves. -->
+  <arg name="bag"/>
+  <arg name="rate" default="1.0"/>
+  <arg name="start" default="0.0"/>
+  <arg name="paused" default="true"/>
+  <arg name="launch_rviz" default="true"/>
+
+  <param name="use_sim_time" value="true"/>
+
+  <node if="$(arg launch_rviz)" pkg="rviz" type="rviz"
+        name="rviz_map1_wide_diagnostic_replay" output="log"
+        args="-d $(find putn_launch)/rviz_config/map1_wide_lesta_bag.rviz"/>
+
+  <group if="$(arg paused)">
+    <node pkg="rosbag" type="play" name="diagnostic_bag_player"
+          output="screen" required="true"
+          args="--clock --pause --rate=$(arg rate) --start=$(arg start) $(arg bag)"/>
+  </group>
+
+  <group unless="$(arg paused)">
+    <node pkg="rosbag" type="play" name="diagnostic_bag_player"
+          output="screen" required="true"
+          args="--clock --rate=$(arg rate) --start=$(arg start) $(arg bag)"/>
+  </group>
+</launch>

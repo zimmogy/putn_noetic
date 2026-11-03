@@ -42,9 +42,9 @@ void ScoutSkidSteer::TwistCmdCallback(
   double steering_vel = msg->angular.z;
 
   double left_side_velocity =
-      (driving_vel - steering_vel * SCOUT_WHEELBASE) / SCOUT_WHEEL_RADIUS;
+      (driving_vel - steering_vel * SCOUT_HALF_TRACK) / SCOUT_WHEEL_RADIUS;
   double right_side_velocity =
-      (driving_vel + steering_vel * SCOUT_WHEELBASE) / SCOUT_WHEEL_RADIUS;
+      (driving_vel + steering_vel * SCOUT_HALF_TRACK) / SCOUT_WHEEL_RADIUS;
 
   motor_cmd[0].data = right_side_velocity;
   motor_cmd[1].data = -left_side_velocity;

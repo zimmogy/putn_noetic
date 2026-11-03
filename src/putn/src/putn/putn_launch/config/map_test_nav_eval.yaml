@@ -9,7 +9,11 @@ evaluation:
 
   success_criteria:
     goal_tolerance_m: 0.5
-    timeout_s: 120.0
+    goal_hold_s: 1.0
+    # A<->C is about 31 m and successful runs already require 107-113 s.
+    # Keep enough margin for turns/replans so timeout represents a real
+    # navigation failure rather than normal long-route variance.
+    timeout_s: 180.0
     stuck_speed_threshold_mps: 0.03
     stuck_duration_s: 8.0
     pit_margin_m: 0.35
@@ -18,21 +22,101 @@ evaluation:
 
   output_fields:
     - episode_id
+    - campaign_session_id
+    - session_attempt_id
     - task_id
     - run_id
+    - direction
+    - attempt_id
     - method
     - success
     - failure_reason
+    - failure_stage
+    - eligible_for_success_rate
     - time_to_goal
+    - navigation_time_excluding_recovery
+    - elapsed_s
+    - session_elapsed_start_s
+    - session_elapsed_end_s
+    - campaign_active_elapsed_start_s
+    - campaign_active_elapsed_end_s
+    - planning_latency_s
+    - final_position_error_m
+    - heading_recovery_count
+    - heading_recovery_time
+    - goal_compensation_refresh_time
+    - max_abs_roll_deg
+    - max_abs_pitch_deg
+    - max_tilt_deg
+    - max_body_up_tilt_deg
+    - max_tilt_violation_duration_s
+    - final_ground_truth_x_m
+    - final_ground_truth_y_m
+    - final_ground_truth_z_m
+    - failure_ground_truth_x_m
+    - failure_ground_truth_y_m
+    - failure_ground_truth_z_m
+    - failure_ground_truth_yaw_deg
+    - failure_roll_deg_signed
+    - failure_pitch_deg_signed
+    - failure_body_up_tilt_deg
+    - failure_episode_distance_m
+    - max_tilt_ground_truth_x_m
+    - max_tilt_ground_truth_y_m
+    - max_tilt_ground_truth_z_m
+    - max_tilt_roll_deg_signed
+    - max_tilt_pitch_deg_signed
+    - max_tilt_body_up_tilt_deg_at_pose
+    - max_tilt_episode_distance_m
+    - max_tilt_elapsed_s
+    - tf_gazebo_offset_start_m
+    - tf_gazebo_offset_max_m
+    - tf_gazebo_offset_final_m
+    - tf_gazebo_dx_start_m
+    - tf_gazebo_dy_start_m
+    - tf_gazebo_dyaw_start_deg
+    - tf_gazebo_dx_final_m
+    - tf_gazebo_dy_final_m
+    - tf_gazebo_dyaw_final_deg
+    - tf_gazebo_offset_time_mean_m
+    - tf_gazebo_offset_time_rms_m
+    - tf_gazebo_offset_above_threshold_s
+    - start_x
+    - start_y
+    - goal_x
+    - goal_y
     - path_length
+    - episode_ground_truth_distance_m
+    - episode_elevation_gain_m
+    - episode_elevation_loss_m
+    - episode_vertical_travel_m
+    - session_ground_truth_distance_start_m
+    - session_ground_truth_distance_end_m
+    - campaign_ground_truth_distance_start_m
+    - campaign_ground_truth_distance_end_m
+    - session_elevation_gain_start_m
+    - session_elevation_gain_end_m
+    - campaign_elevation_gain_start_m
+    - campaign_elevation_gain_end_m
     - planned_path_length
     - min_distance_to_pit
     - min_distance_to_column
     - mean_fused_risk
     - max_fused_risk
+    - valid_path_update_count
+    - accepted_path_count
     - replan_count
+    - path_origin_rejection_count
+    - goal_compensation_refresh_count
+    - goal_compensation_proactive_refresh_count
+    - goal_compensation_forced_refresh_count
+    - control_goal_mismatch_count
+    - online_route_length_estimate_m
 
 map:
+  # The primitive pit/column geometry below belongs only to map_test.world.
+  # It is automatically disabled when the launch scene is map1/map1_wide.
+  hazard_scene: map_test
   bounds:
     x_min: -8.0
     x_max: 8.0
@@ -91,6 +175,61 @@ map:
     - id: column_12
       center: [2.9, 1.0]
       radius_m: 0.30
+
+# map1_wide staged warmup route. Checkpoints are automatically interpolated so
+# PF-RRT* only receives short-range goals. The added platforms occupy x in
+# [-13,-10] and [10,13], and y in [-13,-10].
+warmup:
+  route_start: [0.0, 0.0, 0.0]
+  interpolation_spacing_m: 2.0
+  waypoints:
+    # O -> B: measured safe corridor around the obscuring hill.
+    - id: OB_1
+      point: [-3.8, -2.0, 0.0]
+    - id: OB_2
+      point: [-7.6, -1.5, 0.0]
+    - id: OB_3
+      point: [-9.7, 1.5, 0.0]
+    - id: B
+      point: [-7.8, 7.8, 0.0]
+
+    # B -> C: move out to the negative-X extension before travelling south.
+    - id: BX_outer
+      point: [-11.0, 7.8, 0.0]
+    - id: BC_outer
+      point: [-11.0, -11.0, 0.0]
+    - id: CX_outer
+      point: [-8.5, -11.0, 0.0]
+    - id: C
+      point: [-8.5, -8.3, 0.0]
+
+    # C -> D: use the negative-Y extension.
+    - id: CY_outer
+      point: [-8.5, -11.0, 0.0]
+    - id: DY_outer
+      point: [8.6, -11.0, 0.0]
+    - id: D
+      point: [8.6, -8.2, 0.0]
+
+    # D -> A: use the positive-X extension.
+    - id: DX_outer
+      point: [11.0, -8.2, 0.0]
+    - id: DA_outer
+      point: [11.0, 7.7, 0.0]
+    - id: A
+      point: [8.4, 7.7, 0.0]
+
+    # A -> O: reverse the measured safe O-A corridor.
+    - id: AO_4
+      point: [9.6, -1.1, 0.0]
+    - id: AO_3
+      point: [8.3, -3.1, 0.0]
+    - id: AO_2
+      point: [5.8, -3.0, 0.0]
+    - id: AO_1
+      point: [3.2, -3.1, 0.0]
+    - id: O_return
+      point: [0.0, 0.0, 0.0]
 
 tasks:
   - id: task_01

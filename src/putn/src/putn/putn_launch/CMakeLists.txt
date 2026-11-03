@@ -156,6 +156,8 @@ include_directories(
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
+  scripts/patch_lidar_blind_spot.py
+  scripts/run_isolated_nav_campaign.py
   scripts/run_map_test_nav_eval.py
   scripts/run_manual_goal_eval.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

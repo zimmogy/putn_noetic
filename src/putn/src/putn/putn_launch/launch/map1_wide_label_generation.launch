@@ -1,0 +1,29 @@
+<launch>
+  <arg name="lidarscan_topic" default="/velodyne_points"/>
+  <arg name="map_frame" default="world"/>
+  <arg name="map_length_x" default="500.0"/>
+  <arg name="map_length_y" default="500.0"/>
+  <arg name="grid_resolution" default="0.1"/>
+  <arg name="launch_rviz" default="true"/>
+
+  <param name="use_sim_time" value="true"/>
+
+  <node pkg="lesta" type="label_generation_node"
+        name="lesta_label_generation" output="screen">
+    <rosparam command="load" file="$(find lesta)/config/label_generation_node.yaml"/>
+    <rosparam command="load" file="$(find lesta)/config/include/feature_extraction_params.yaml"/>
+
+    <!-- Load these after the YAML so the bag/simulation settings win. -->
+    <param name="node/lidarscan_topic" value="$(arg lidarscan_topic)"/>
+    <param name="frame_id/robot_frame" value="base_link"/>
+    <param name="frame_id/map_frame" value="$(arg map_frame)"/>
+    <param name="height_mapper/frame_id" value="$(arg map_frame)"/>
+    <param name="height_mapper/map_length_x" value="$(arg map_length_x)"/>
+    <param name="height_mapper/map_length_y" value="$(arg map_length_y)"/>
+    <param name="height_mapper/grid_resolution" value="$(arg grid_resolution)"/>
+  </node>
+
+  <node if="$(arg launch_rviz)" pkg="rviz" type="rviz"
+        name="rviz_label_generation" output="log"
+        args="-d $(find lesta)/launch/include/label_generation.rviz"/>
+</launch>
